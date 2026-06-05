@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Finance Tracker{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+{% if current_user.is_authenticated %}
+  <nav class="nav">
+    <div class="brand">💰 FinTrack</div>
+    <div class="links">
+      <a href="{{ url_for('main.dashboard') }}" class="{{ 'active' if request.endpoint=='main.dashboard' }}">Dashboard</a>
+      <a href="{{ url_for('main.transactions') }}" class="{{ 'active' if request.endpoint=='main.transactions' }}">Transactions</a>
+      <a href="{{ url_for('main.portfolio') }}" class="{{ 'active' if request.endpoint=='main.portfolio' }}">Portfolio</a>
+    </div>
+    <div class="user">
+      <span>{{ current_user.username }}</span>
+      <a class="btn-ghost" href="{{ url_for('auth.logout') }}">Logout</a>
+    </div>
+  </nav>
+{% endif %}
+
+<main class="container {{ 'narrow' if not current_user.is_authenticated }}">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="flashes">
+        {% for category, msg in messages %}
+          <div class="flash {{ category }}">{{ msg }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  {% block content %}{% endblock %}
+</main>
+</body>
+</html>

@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Sign up · FinTrack{% endblock %}
+{% block content %}
+<div class="auth-card">
+  <h1>💰 FinTrack</h1>
+  <p class="sub">Create your account.</p>
+  <form method="post" action="{{ url_for('auth.register') }}">
+    <label>Username
+      <input name="username" autocomplete="username" required autofocus>
+    </label>
+    <label>Email <span class="opt">(optional)</span>
+      <input name="email" type="email" autocomplete="email">
+    </label>
+    <label>Password <span class="opt">(min 6 characters)</span>
+      <input name="password" type="password" autocomplete="new-password" required>
+    </label>
+    <button class="btn" type="submit">Create account</button>
+  </form>
+  <p class="switch">Already have an account? <a href="{{ url_for('auth.login') }}">Log in</a></p>
+</div>
+{% endblock %}
