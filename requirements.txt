@@ -1,5 +1,25 @@
+# Web framework & ORM
 Flask>=3.0
 Flask-SQLAlchemy>=3.1
-Flask-Login>=0.6
+Flask-Login>=0.6                 # secure server-side sessions (web UI)
+SQLAlchemy>=2.0
+
+# Auth: JWT for the REST API, bcrypt for password hashing
+Flask-JWT-Extended>=4.6
+Flask-Bcrypt>=1.0
+
+# Async tasks & caching
+celery>=5.3
+redis>=5.0
+
+# Market data APIs
+requests>=2.31                  # Alpha Vantage REST
+yfinance>=0.2.40                # Yahoo Finance
+
+# Database drivers / server
+psycopg2-binary>=2.9            # PostgreSQL driver (production)
+gunicorn>=21.2                  # WSGI server (Docker)
+
+# Visualisation & config
 matplotlib>=3.8
-psycopg2-binary>=2.9   # PostgreSQL driver (production)
+python-dotenv>=1.0

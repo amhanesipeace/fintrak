@@ -1,25 +1,27 @@
 {% extends "base.html" %}
 {% block title %}Portfolio · FinTrack{% endblock %}
 {% block content %}
-<h1 class="page-title">Crypto Portfolio</h1>
+<h1 class="page-title">Stock Portfolio</h1>
 
 <div class="stats">
   <div class="stat wide">
     <span class="stat-label">Total portfolio value <span class="live">● LIVE</span></span>
     <span class="stat-value pos">{{ total|money }}</span>
-    <span class="stat-sub">Live prices from CoinGecko</span>
+    <span class="stat-sub">Live quotes from Alpha Vantage / Yahoo Finance</span>
   </div>
 </div>
 
 <div class="card">
   <h2>Add holding</h2>
   <form class="row-form" method="post" action="{{ url_for('main.add_holding') }}">
-    <label>Coin
-      <select name="coin_id" required>
-        {% for c in coins %}<option value="{{ c.id }}">{{ c.name }} ({{ c.symbol }})</option>{% endfor %}
-      </select>
+    <label>Ticker
+      <input name="symbol" list="stock-list" placeholder="e.g. AAPL"
+             autocomplete="off" required>
+      <datalist id="stock-list">
+        {% for s in stocks %}<option value="{{ s.symbol }}">{{ s.name }}</option>{% endfor %}
+      </datalist>
     </label>
-    <label>Quantity
+    <label>Shares
       <input name="quantity" type="number" step="any" min="0" placeholder="0.0" required>
     </label>
     <button class="btn" type="submit">Add</button>
@@ -30,7 +32,7 @@
   <div class="card-head"><h2>Your holdings</h2></div>
   {% if rows %}
   <table class="table">
-    <thead><tr><th>Coin</th><th class="r">Quantity</th><th class="r">Price</th><th class="r">Value</th><th></th></tr></thead>
+    <thead><tr><th>Stock</th><th class="r">Shares</th><th class="r">Price</th><th class="r">Value</th><th></th></tr></thead>
     <tbody>
       {% for r in rows %}
       <tr>
@@ -49,7 +51,7 @@
     </tbody>
   </table>
   {% else %}
-  <p class="empty">No holdings yet. Add a coin above to track its live value.</p>
+  <p class="empty">No holdings yet. Add a stock above to track its live value.</p>
   {% endif %}
 </div>
 {% endblock %}

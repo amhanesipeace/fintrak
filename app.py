@@ -1,15 +1,18 @@
-"""Application factory for the Personal Finance Tracker."""
-from flask import Flask
+"""Application factory for FinTrak — full-stack financial management SaaS."""
+from flask import Flask, jsonify
 
 from config import Config
-from extensions import db, login_manager
+from extensions import db, login_manager, bcrypt, jwt
 
 
 def create_app(config_object=Config):
     app = Flask(__name__)
     app.config.from_object(config_object)
 
+    # Initialise extensions.
     db.init_app(app)
+    bcrypt.init_app(app)
+    jwt.init_app(app)
     login_manager.init_app(app)
 
     # Import models so SQLAlchemy is aware of them, then wire the user loader.
@@ -35,6 +38,18 @@ def create_app(config_object=Config):
         except (TypeError, ValueError):
             return "$0.00"
 
+    # Liveness/readiness probe for Docker & load balancers.
+    @app.route("/healthz")
+    def healthz():
+        import cache
+        db_ok = True
+        try:
+            db.session.execute(db.text("SELECT 1"))
+        except Exception:
+            db_ok = False
+        return jsonify({"status": "ok" if db_ok else "degraded",
+                        "db": db_ok, "redis": cache.ping()}), (200 if db_ok else 503)
+
     # Create tables on first run (no-op if they already exist).
     with app.app_context():
         db.create_all()
@@ -46,5 +61,5 @@ app = create_app()
 
 
 if __name__ == "__main__":
-    print("  Personal Finance Tracker running at http://localhost:5060")
-    app.run(host="127.0.0.1", port=5060, threaded=True, debug=False)
+    print("  FinTrak running at http://localhost:5060")
+    app.run(host="0.0.0.0", port=5060, threaded=True, debug=False)
