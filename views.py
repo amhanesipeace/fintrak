@@ -85,39 +85,37 @@ def delete_transaction(tid):
 @login_required
 def portfolio():
     holdings = Holding.query.filter_by(user_id=current_user.id).all()
-    prices = market.get_prices([h.coin_id for h in holdings]) if holdings else {}
+    prices = market.get_quotes([h.symbol for h in holdings]) if holdings else {}
     rows, total = [], 0.0
     for h in holdings:
-        price = prices.get(h.coin_id) or 0.0
+        price = prices.get(h.symbol) or 0.0
         value = price * h.quantity
         total += value
         rows.append({"h": h, "price": price, "value": value})
     rows.sort(key=lambda r: r["value"], reverse=True)
     return render_template("portfolio.html", rows=rows, total=total,
-                           coins=market.COINS)
+                           stocks=market.STOCKS)
 
 
 @main.route("/portfolio/add", methods=["POST"])
 @login_required
 def add_holding():
-    coin_id = request.form.get("coin_id")
-    coin = market.COIN_BY_ID.get(coin_id)
+    symbol = (request.form.get("symbol") or "").upper().strip()
     try:
         qty = float(request.form.get("quantity", ""))
-        if not coin or qty <= 0:
+        if not symbol or qty <= 0:
             raise ValueError("bad input")
         existing = Holding.query.filter_by(user_id=current_user.id,
-                                           coin_id=coin_id).first()
+                                           symbol=symbol).first()
         if existing:
             existing.quantity += qty
         else:
-            db.session.add(Holding(user_id=current_user.id, coin_id=coin_id,
-                                   symbol=coin["symbol"], name=coin["name"],
-                                   quantity=qty))
+            db.session.add(Holding(user_id=current_user.id, symbol=symbol,
+                                   name=market.lookup_name(symbol), quantity=qty))
         db.session.commit()
-        flash(f"Added {qty:g} {coin['symbol']}.", "success")
+        flash(f"Added {qty:g} {symbol}.", "success")
     except Exception:
-        flash("Please choose a coin and enter a valid quantity.", "error")
+        flash("Please choose a stock and enter a valid quantity.", "error")
     return redirect(url_for("main.portfolio"))
 
 

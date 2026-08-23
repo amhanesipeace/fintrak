@@ -8,6 +8,9 @@ venv/
 *.db
 instance/
 
+# Secrets / environment
+.env
+
 # macOS
 .DS_Store
 

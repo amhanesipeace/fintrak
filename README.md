@@ -1,94 +1,118 @@
-# 💰 FinTrack — Personal Finance Tracker
+# 💰 FinTrak — Full-Stack Financial Management SaaS
 
-A web application built with **Flask** for tracking and managing personal
-finances. Features secure user authentication, server-side data visualisation
-with **Matplotlib**, a **RESTful API**, and real-time financial data from a
-live market API. Backed by **SQLAlchemy** so it runs on SQLite locally and
-**PostgreSQL** in production with no code changes.
+A full-stack personal-finance platform built with **Flask** and **SQLAlchemy**.
+It tracks income/expenses, values a live **stock portfolio**, exposes a
+**JWT-secured REST API**, and offloads market-data work to **Celery** with
+**Redis** caching. It runs on a **normalised PostgreSQL** schema with
+connection pooling and ships as a **Docker Compose** stack.
 
-## Features
+## Stack
 
-- 🔐 **User authentication** — register / login / logout with hashed passwords
-  (Werkzeug) and session management (Flask-Login)
-- 💸 **Income & expense tracking** — add, categorise, date, annotate and delete
-  transactions; running balance and totals
-- 📊 **Data visualisation (Matplotlib)** — spending-by-category donut and a
-  6-month income-vs-expense bar chart, rendered server-side as PNGs
-- 📈 **Real-time financial data** — a crypto portfolio valued with **live prices
-  from the CoinGecko REST API** (no API key required)
-- 🧩 **RESTful JSON API** — programmatic access to summary, transactions, and
-  live prices
-- 🗄️ **PostgreSQL-ready schema** — clean, indexed SQLAlchemy models
+| Concern | Technology |
+| --- | --- |
+| Web / API | Flask (application factory, blueprints — MVC) |
+| ORM / DB | SQLAlchemy → PostgreSQL (SQLite for local dev) |
+| Auth | **JWT** (Flask-JWT-Extended) for the API · **bcrypt** password hashing · Flask-Login secure sessions for the UI |
+| Market data | **Alpha Vantage** (primary) + **Yahoo Finance** (fallback) |
+| Async / cache | **Celery** task queue + beat · **Redis** cache & broker |
+| Visualisation | Matplotlib (server-rendered PNG charts) |
+| Packaging | **Docker** + Docker Compose (web, worker, beat, db, redis) |
 
 ## Architecture
 
 ```
-app.py            Application factory, config, money filter
-config.py         Settings (SECRET_KEY, DATABASE_URL -> SQLite/PostgreSQL)
-extensions.py     Shared db + login_manager instances
-models.py         SQLAlchemy models: User, Transaction, Holding (indexed)
-auth.py           Blueprint: register / login / logout
-views.py          Blueprint: dashboard, transactions, portfolio, chart images
-api.py            Blueprint: RESTful JSON endpoints (/api/...)
-charts.py         Matplotlib chart rendering (thread-safe Figure API)
-market.py         CoinGecko live-price integration (cached)
-templates/        Jinja2 templates (server-rendered UI)
-static/style.css  Dark finance theme
-seed.py           Demo account + sample data
+app.py            Application factory, extensions, /healthz, money filter
+config.py         Config: Postgres + connection pool, JWT, Redis/Celery, APIs
+extensions.py     Shared singletons: db, bcrypt, jwt, login_manager
+models.py         Normalised, indexed models: User, Transaction, Holding
+security.py       auth_required — accepts a JWT bearer token OR a session
+auth.py           Web blueprint: register / login / logout (bcrypt)
+views.py          Web blueprint: dashboard, transactions, portfolio, charts
+api.py            REST blueprint: /api/auth/* (JWT) + data endpoints
+market.py         Alpha Vantage + Yahoo Finance quotes (Redis-cached)
+cache.py          Redis wrapper with graceful degradation
+celery_app.py     Celery app + beat schedule
+tasks.py          Async tasks: refresh_quotes, refresh_symbol
+charts.py         Matplotlib charts (thread-safe Figure API)
+Dockerfile        Image for web / worker / beat
+docker-compose.yml  Postgres + Redis + web + worker + beat
 ```
 
-## Quick start
+## Quick start (Docker — recommended)
 
 ```bash
 cd ~/finance-tracker
-pip install -r requirements.txt     # first time only
-python3 seed.py                     # optional: demo account + sample data
-python3 app.py                      # http://localhost:5060
+cp .env.example .env          # already provided for local dev
+docker compose up --build     # web, worker, beat, postgres, redis
+
+# (first run, in another terminal) create the demo account + sample data:
+docker compose exec web python seed.py
 ```
 
-Open **http://localhost:5060**. Log in to the demo account (**`demo` / `demo123`**)
-or register your own.
+Open **http://localhost:8000** and log in with **`demo` / `demo123`**.
+Health check: **http://localhost:8000/healthz**.
+
+## Quick start (no Docker)
+
+Needs local PostgreSQL + Redis running (or omit `DATABASE_URL` to use SQLite;
+Redis caching then degrades gracefully to no-ops).
+
+```bash
+pip install -r requirements.txt
+export DATABASE_URL="postgresql://fintrak:fintrak@localhost:5432/fintrak"
+export REDIS_URL="redis://localhost:6379/0"
+python3 seed.py
+python3 app.py                # http://localhost:8000
+
+# in separate terminals, for async quote refresh:
+celery -A celery_app.celery worker --loglevel=info
+celery -A celery_app.celery beat   --loglevel=info
+```
 
 ## REST API
 
-All endpoints require an authenticated session.
-
-| Method & path                | Description                          |
-| ---------------------------- | ----------------------------------- |
-| `GET  /api/summary`          | Income, expense, and balance totals |
-| `GET  /api/transactions`     | List your transactions (JSON)       |
-| `POST /api/transactions`     | Create a transaction (JSON body)    |
-| `DELETE /api/transactions/<id>` | Delete a transaction             |
-| `GET  /api/prices?ids=bitcoin,ethereum` | Live market prices       |
-
-Example:
+Get a token, then call the data endpoints with `Authorization: Bearer <token>`.
+(Data endpoints also accept a browser session cookie.)
 
 ```bash
-curl -X POST http://localhost:5060/api/transactions \
+# Register (or login) to receive access + refresh tokens
+curl -X POST http://localhost:8000/api/auth/login \
   -H "Content-Type: application/json" \
+  -d '{"username":"demo","password":"demo123"}'
+
+TOKEN=...   # access_token from the response
+
+# Add a transaction
+curl -X POST http://localhost:8000/api/transactions \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   -d '{"type":"expense","amount":12.50,"category":"Food","note":"lunch"}'
 ```
 
-## Using PostgreSQL
+| Method & path | Description |
+| --- | --- |
+| `POST /api/auth/register` | Create account → tokens |
+| `POST /api/auth/login` | Log in → access + refresh tokens |
+| `POST /api/auth/refresh` | New access token (send refresh token) |
+| `GET  /api/me` | Current user |
+| `GET  /api/summary` | Income, expense, balance |
+| `GET/POST /api/transactions` | List / create transactions |
+| `DELETE /api/transactions/<id>` | Delete a transaction |
+| `GET  /api/quotes?symbols=AAPL,MSFT` | Live stock quotes (cached) |
+| `GET  /api/portfolio` | Valued holdings + total |
 
-The app uses SQLite by default. To run on PostgreSQL, just set `DATABASE_URL`
-(the schema is created automatically on first run):
+## Performance notes
 
-```bash
-export DATABASE_URL="postgresql://user:password@localhost:5432/finance"
-export SECRET_KEY="a-long-random-string"
-python3 app.py
-```
+- **Indexing**: composite `ix_txn_user_date` and `ix_holding_user_symbol`
+  match the hottest queries; foreign keys are indexed.
+- **Connection pooling**: `pool_size`, `max_overflow`, `pool_recycle` and
+  `pool_pre_ping` are configured for PostgreSQL in `config.py`.
+- **Redis caching + Celery**: quotes are cached with a TTL and pre-warmed by a
+  beat task, so portfolio pages render from cache rather than blocking on
+  external APIs.
 
-The `psycopg2-binary` driver is already in `requirements.txt`.
+## Security notes
 
-## Tech stack
-
-Flask · Flask-SQLAlchemy · Flask-Login · SQLAlchemy · Matplotlib ·
-PostgreSQL / SQLite · CoinGecko REST API · Jinja2 · vanilla CSS
-
-## Notes
-
-- Passwords are stored hashed; never in plain text.
-- Set a strong `SECRET_KEY` in production.
-- The crypto portfolio is for tracking only — no real funds are involved.
+- Passwords are hashed with **bcrypt**; never stored in plain text.
+- API auth uses signed **JWT** access/refresh tokens.
+- Set strong `SECRET_KEY` / `JWT_SECRET_KEY` in `.env` for anything non-local.
+- The portfolio tracks quantities only — no real funds or brokerage access.

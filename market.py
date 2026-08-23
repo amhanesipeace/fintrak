@@ -1,52 +1,109 @@
-"""Real-time crypto prices via the public CoinGecko REST API (no key needed)."""
-import json
-import time
-import urllib.parse
-import urllib.request
+"""Live equity quotes from Alpha Vantage (primary) and Yahoo Finance (fallback).
 
-CG = "https://api.coingecko.com/api/v3"
+Quotes are cached in Redis (see cache.py) for `QUOTE_CACHE_TTL` seconds so
+repeated look-ups are sub-millisecond and we stay within provider rate limits.
+Alpha Vantage is used when ALPHAVANTAGE_API_KEY is set; otherwise — and on any
+Alpha Vantage error or rate-limit — we fall back to Yahoo Finance (yfinance).
+"""
+import os
 
-# Curated set of popular coins offered in the "add holding" dropdown.
-COINS = [
-    {"id": "bitcoin", "symbol": "BTC", "name": "Bitcoin"},
-    {"id": "ethereum", "symbol": "ETH", "name": "Ethereum"},
-    {"id": "binancecoin", "symbol": "BNB", "name": "BNB"},
-    {"id": "solana", "symbol": "SOL", "name": "Solana"},
-    {"id": "ripple", "symbol": "XRP", "name": "XRP"},
-    {"id": "cardano", "symbol": "ADA", "name": "Cardano"},
-    {"id": "dogecoin", "symbol": "DOGE", "name": "Dogecoin"},
-    {"id": "polkadot", "symbol": "DOT", "name": "Polkadot"},
-    {"id": "litecoin", "symbol": "LTC", "name": "Litecoin"},
-    {"id": "chainlink", "symbol": "LINK", "name": "Chainlink"},
+import requests
+
+import cache
+
+ALPHAVANTAGE_API_KEY = os.environ.get("ALPHAVANTAGE_API_KEY", "")
+QUOTE_CACHE_TTL = int(os.environ.get("QUOTE_CACHE_TTL", 60))
+AV_URL = "https://www.alphavantage.co/query"
+
+# Curated set of popular tickers offered in the "add holding" dropdown.
+# Users may also type any other valid symbol.
+STOCKS = [
+    {"symbol": "AAPL", "name": "Apple Inc."},
+    {"symbol": "MSFT", "name": "Microsoft Corporation"},
+    {"symbol": "GOOGL", "name": "Alphabet Inc."},
+    {"symbol": "AMZN", "name": "Amazon.com, Inc."},
+    {"symbol": "NVDA", "name": "NVIDIA Corporation"},
+    {"symbol": "META", "name": "Meta Platforms, Inc."},
+    {"symbol": "TSLA", "name": "Tesla, Inc."},
+    {"symbol": "JPM", "name": "JPMorgan Chase & Co."},
+    {"symbol": "V", "name": "Visa Inc."},
+    {"symbol": "SPY", "name": "SPDR S&P 500 ETF Trust"},
 ]
-COIN_BY_ID = {c["id"]: c for c in COINS}
-
-_cache = {}
-_TTL = 60  # seconds — keep within CoinGecko's free rate limits
+STOCK_BY_SYMBOL = {s["symbol"]: s for s in STOCKS}
 
 
-def get_prices(coin_ids, vs="usd"):
-    """Return {coin_id: price} for the given CoinGecko ids."""
-    coin_ids = sorted({c for c in coin_ids if c})
-    if not coin_ids:
-        return {}
-
-    key = (",".join(coin_ids), vs)
-    now = time.time()
-    hit = _cache.get(key)
-    if hit and now - hit[0] < _TTL:
-        return hit[1]
-
-    qs = urllib.parse.urlencode({"ids": ",".join(coin_ids), "vs_currencies": vs})
-    url = f"{CG}/simple/price?{qs}"
-    req = urllib.request.Request(url, headers={"User-Agent": "finance-tracker/1.0"})
+def _av_quote(symbol):
+    """Fetch a single quote from Alpha Vantage, or None on any problem."""
+    if not ALPHAVANTAGE_API_KEY:
+        return None
     try:
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-    except Exception:
-        # On API/network failure, fall back to any cached value or zeros.
-        return hit[1] if hit else {cid: None for cid in coin_ids}
+        resp = requests.get(AV_URL, params={
+            "function": "GLOBAL_QUOTE",
+            "symbol": symbol,
+            "apikey": ALPHAVANTAGE_API_KEY,
+        }, timeout=10)
+        resp.raise_for_status()
+        price = resp.json().get("Global Quote", {}).get("05. price")
+        return float(price) if price else None
+    except (requests.RequestException, ValueError, TypeError):
+        return None
 
-    prices = {cid: (data.get(cid) or {}).get(vs) for cid in coin_ids}
-    _cache[key] = (now, prices)
-    return prices
+
+def _yf_quote(symbol):
+    """Fetch a single quote from Yahoo Finance, or None on any problem."""
+    try:
+        import yfinance as yf
+        fi = yf.Ticker(symbol).fast_info
+        # yfinance FastInfo exposes values via attributes; .get() returns None.
+        price = getattr(fi, "last_price", None)
+        if price is None:
+            try:
+                price = fi["last_price"]
+            except Exception:
+                price = None
+        return float(price) if price else None
+    except Exception:
+        return None
+
+
+def _fetch_quote(symbol):
+    """Alpha Vantage first, then Yahoo Finance as a fallback."""
+    return _av_quote(symbol) or _yf_quote(symbol)
+
+
+def get_quote(symbol):
+    """Return the latest price for one symbol (Redis-cached), or None."""
+    symbol = symbol.upper().strip()
+    if not symbol:
+        return None
+
+    key = f"quote:{symbol}"
+    cached = cache.get_json(key)
+    if cached is not None:
+        return cached
+
+    price = _fetch_quote(symbol)
+    if price is not None:
+        cache.set_json(key, price, QUOTE_CACHE_TTL)
+    return price
+
+
+def get_quotes(symbols):
+    """Return {SYMBOL: price} for many symbols, using the per-symbol cache."""
+    out = {}
+    for s in {sym.upper().strip() for sym in symbols if sym}:
+        out[s] = get_quote(s)
+    return out
+
+
+def lookup_name(symbol):
+    """Best-effort company/ETF name for a freshly added symbol."""
+    symbol = symbol.upper().strip()
+    if symbol in STOCK_BY_SYMBOL:
+        return STOCK_BY_SYMBOL[symbol]["name"]
+    try:
+        import yfinance as yf
+        info = yf.Ticker(symbol).info or {}
+        return info.get("shortName") or info.get("longName") or symbol
+    except Exception:
+        return symbol

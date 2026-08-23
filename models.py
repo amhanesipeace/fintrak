@@ -1,10 +1,13 @@
-"""Database models — designed to run efficiently on PostgreSQL (and SQLite)."""
+"""SQLAlchemy models — normalised schema, indexed for PostgreSQL (and SQLite).
+
+Passwords are hashed with bcrypt (via Flask-Bcrypt). The stock portfolio is
+valued from the Alpha Vantage / Yahoo Finance quote services.
+"""
 from datetime import datetime, date
 
 from flask_login import UserMixin
-from werkzeug.security import generate_password_hash, check_password_hash
 
-from extensions import db
+from extensions import db, bcrypt
 
 
 class User(UserMixin, db.Model):
@@ -12,7 +15,7 @@ class User(UserMixin, db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(64), unique=True, nullable=False, index=True)
-    email = db.Column(db.String(120), unique=True)
+    email = db.Column(db.String(120), unique=True, index=True)
     password_hash = db.Column(db.String(255), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -24,10 +27,11 @@ class User(UserMixin, db.Model):
     )
 
     def set_password(self, password):
-        self.password_hash = generate_password_hash(password)
+        # bcrypt returns bytes; store as utf-8 string.
+        self.password_hash = bcrypt.generate_password_hash(password).decode("utf-8")
 
     def check_password(self, password):
-        return check_password_hash(self.password_hash, password)
+        return bcrypt.check_password_hash(self.password_hash, password)
 
 
 class Transaction(db.Model):
@@ -44,7 +48,7 @@ class Transaction(db.Model):
     date = db.Column(db.Date, nullable=False, default=date.today, index=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    # composite index that matches our most common query (a user's history)
+    # Composite index matching our hottest query: a user's history by date.
     __table_args__ = (
         db.Index("ix_txn_user_date", "user_id", "date"),
     )
@@ -61,14 +65,28 @@ class Transaction(db.Model):
 
 
 class Holding(db.Model):
+    """A quantity of a publicly traded equity, valued from live quotes."""
     __tablename__ = "holdings"
 
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(
         db.Integer, db.ForeignKey("users.id"), nullable=False, index=True
     )
-    coin_id = db.Column(db.String(50), nullable=False)       # CoinGecko id, e.g. "bitcoin"
-    symbol = db.Column(db.String(20))
-    name = db.Column(db.String(80))
+    symbol = db.Column(db.String(20), nullable=False)        # e.g. "AAPL"
+    name = db.Column(db.String(120))                         # e.g. "Apple Inc."
     quantity = db.Column(db.Float, nullable=False, default=0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # One row per (user, symbol); look-ups filter on both.
+    __table_args__ = (
+        db.UniqueConstraint("user_id", "symbol", name="uq_holding_user_symbol"),
+        db.Index("ix_holding_user_symbol", "user_id", "symbol"),
+    )
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "symbol": self.symbol,
+            "name": self.name,
+            "quantity": self.quantity,
+        }

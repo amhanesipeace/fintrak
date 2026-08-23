@@ -44,10 +44,12 @@ def run():
                 db.session.add(Transaction(user_id=user.id, type="expense",
                     amount=amt, category=cat, note="", date=d))
 
-        db.session.add(Holding(user_id=user.id, coin_id="bitcoin",
-            symbol="BTC", name="Bitcoin", quantity=0.15))
-        db.session.add(Holding(user_id=user.id, coin_id="ethereum",
-            symbol="ETH", name="Ethereum", quantity=2.0))
+        db.session.add(Holding(user_id=user.id, symbol="AAPL",
+            name="Apple Inc.", quantity=10))
+        db.session.add(Holding(user_id=user.id, symbol="MSFT",
+            name="Microsoft Corporation", quantity=5))
+        db.session.add(Holding(user_id=user.id, symbol="SPY",
+            name="SPDR S&P 500 ETF Trust", quantity=3))
         db.session.commit()
         print("Seeded demo data. Login: demo / demo123")
 
