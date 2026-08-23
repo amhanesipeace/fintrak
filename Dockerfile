@@ -23,8 +23,8 @@ COPY . .
 RUN useradd --create-home appuser && chown -R appuser:appuser /app
 USER appuser
 
-EXPOSE 5060
+EXPOSE 8000
 
 # Default command runs the web server; worker/beat override this in compose.
-CMD ["gunicorn", "--bind", "0.0.0.0:5060", "--workers", "4", \
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "4", \
      "--timeout", "60", "app:app"]

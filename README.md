@@ -49,8 +49,8 @@ docker compose up --build     # web, worker, beat, postgres, redis
 docker compose exec web python seed.py
 ```
 
-Open **http://localhost:5060** and log in with **`demo` / `demo123`**.
-Health check: **http://localhost:5060/healthz**.
+Open **http://localhost:8000** and log in with **`demo` / `demo123`**.
+Health check: **http://localhost:8000/healthz**.
 
 ## Quick start (no Docker)
 
@@ -62,7 +62,7 @@ pip install -r requirements.txt
 export DATABASE_URL="postgresql://fintrak:fintrak@localhost:5432/fintrak"
 export REDIS_URL="redis://localhost:6379/0"
 python3 seed.py
-python3 app.py                # http://localhost:5060
+python3 app.py                # http://localhost:8000
 
 # in separate terminals, for async quote refresh:
 celery -A celery_app.celery worker --loglevel=info
@@ -76,14 +76,14 @@ Get a token, then call the data endpoints with `Authorization: Bearer <token>`.
 
 ```bash
 # Register (or login) to receive access + refresh tokens
-curl -X POST http://localhost:5060/api/auth/login \
+curl -X POST http://localhost:8000/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username":"demo","password":"demo123"}'
 
 TOKEN=...   # access_token from the response
 
 # Add a transaction
-curl -X POST http://localhost:5060/api/transactions \
+curl -X POST http://localhost:8000/api/transactions \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   -d '{"type":"expense","amount":12.50,"category":"Food","note":"lunch"}'
 ```

@@ -61,5 +61,5 @@ app = create_app()
 
 
 if __name__ == "__main__":
-    print("  FinTrak running at http://localhost:5060")
-    app.run(host="0.0.0.0", port=5060, threaded=True, debug=False)
+    print("  FinTrak running at http://localhost:8000")
+    app.run(host="0.0.0.0", port=8000, threaded=True, debug=False)
