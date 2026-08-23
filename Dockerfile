@@ -26,5 +26,6 @@ USER appuser
 EXPOSE 8000
 
 # Default command runs the web server; worker/beat override this in compose.
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "4", \
-     "--timeout", "60", "app:app"]
+# Shell form so $PORT (set by Render/other PaaS) and $WEB_CONCURRENCY expand;
+# both fall back to sensible local defaults.
+CMD gunicorn --bind 0.0.0.0:${PORT:-8000} --workers ${WEB_CONCURRENCY:-2} --timeout 60 app:app

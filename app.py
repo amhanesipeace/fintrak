@@ -1,4 +1,6 @@
 """Application factory for FinTrak — full-stack financial management SaaS."""
+import os
+
 from flask import Flask, jsonify
 
 from config import Config
@@ -53,6 +55,14 @@ def create_app(config_object=Config):
     # Create tables on first run (no-op if they already exist).
     with app.app_context():
         db.create_all()
+
+        # Optional one-time demo seed for shell-less deploys (Render free tier).
+        if os.environ.get("SEED_ON_START") == "1":
+            try:
+                from seed import seed_demo
+                seed_demo()
+            except Exception as exc:  # never let seeding block app startup
+                app.logger.warning("SEED_ON_START skipped: %s", exc)
 
     return app
 

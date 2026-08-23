@@ -1,0 +1,73 @@
+# Render Blueprint — deploys FinTrak from this repo.
+# In the Render dashboard: New + → Blueprint → pick this repo → Apply.
+# Docs: https://render.com/docs/blueprint-spec
+
+databases:
+  - name: fintrak-db
+    plan: free              # free PostgreSQL (expires after 90 days)
+
+services:
+  # --- Redis (Render "Key Value") — cache + Celery broker ---------------
+  - type: keyvalue
+    name: fintrak-redis
+    plan: free              # free 25 MB instance
+    ipAllowList: []         # internal-only (no public access)
+    maxmemoryPolicy: allkeys-lru
+
+  # --- Flask web + REST API --------------------------------------------
+  - type: web
+    name: fintrak-web
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /healthz
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true          # Render generates a strong secret
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: ALPHAVANTAGE_API_KEY
+        sync: false                  # set this yourself in the dashboard
+      - key: SEED_ON_START
+        value: "1"                   # create demo/demo123 on first boot
+      - key: WEB_CONCURRENCY
+        value: "2"                   # gunicorn workers (fits 512 MB free RAM)
+      - key: QUOTE_CACHE_TTL
+        value: "60"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: fintrak-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: fintrak-redis
+          property: connectionString
+
+# --- OPTIONAL: Celery worker + beat ------------------------------------
+# Render background workers are a PAID plan (no free tier). The app works
+# fine without them (quotes are fetched on demand and cached in Redis);
+# these just pre-warm the cache. To enable, move them under `services:`
+# above and set `plan: starter`.
+#
+#  - type: worker
+#    name: fintrak-worker
+#    runtime: docker
+#    plan: starter
+#    dockerfilePath: ./Dockerfile
+#    dockerCommand: celery -A celery_app.celery worker --loglevel=info
+#    envVars:
+#      - key: DATABASE_URL
+#        fromDatabase: { name: fintrak-db, property: connectionString }
+#      - key: REDIS_URL
+#        fromService: { type: keyvalue, name: fintrak-redis, property: connectionString }
+#
+#  - type: worker
+#    name: fintrak-beat
+#    runtime: docker
+#    plan: starter
+#    dockerfilePath: ./Dockerfile
+#    dockerCommand: celery -A celery_app.celery beat --loglevel=info
+#    envVars:
+#      - key: REDIS_URL
+#        fromService: { type: keyvalue, name: fintrak-redis, property: connectionString }
