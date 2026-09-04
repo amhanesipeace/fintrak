@@ -3,11 +3,16 @@
 Passwords are hashed with bcrypt (via Flask-Bcrypt). The stock portfolio is
 valued from the Alpha Vantage / Yahoo Finance quote services.
 """
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 
 from flask_login import UserMixin
 
 from extensions import db, bcrypt
+
+
+def utcnow():
+    """Timezone-aware UTC timestamp (replaces the deprecated datetime.utcnow)."""
+    return datetime.now(timezone.utc)
 
 
 class User(UserMixin, db.Model):
@@ -17,7 +22,7 @@ class User(UserMixin, db.Model):
     username = db.Column(db.String(64), unique=True, nullable=False, index=True)
     email = db.Column(db.String(120), unique=True, index=True)
     password_hash = db.Column(db.String(255), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utcnow)
 
     transactions = db.relationship(
         "Transaction", backref="user", lazy=True, cascade="all, delete-orphan"
@@ -46,7 +51,7 @@ class Transaction(db.Model):
     category = db.Column(db.String(50), nullable=False, index=True)
     note = db.Column(db.String(255))
     date = db.Column(db.Date, nullable=False, default=date.today, index=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utcnow)
 
     # Composite index matching our hottest query: a user's history by date.
     __table_args__ = (
@@ -75,7 +80,7 @@ class Holding(db.Model):
     symbol = db.Column(db.String(20), nullable=False)        # e.g. "AAPL"
     name = db.Column(db.String(120))                         # e.g. "Apple Inc."
     quantity = db.Column(db.Float, nullable=False, default=0)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utcnow)
 
     # One row per (user, symbol); look-ups filter on both.
     __table_args__ = (
