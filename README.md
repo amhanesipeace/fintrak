@@ -69,6 +69,19 @@ celery -A celery_app.celery worker --loglevel=info
 celery -A celery_app.celery beat   --loglevel=info
 ```
 
+## Testing
+
+The suite is self-contained — it uses a throwaway SQLite database and a stubbed
+Redis, so no PostgreSQL, Redis, or network access is required.
+
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
+
+Covers the health probe and routing, JWT + session authentication, and the
+data models (bcrypt hashing, constraints, cascade deletes, serialization).
+
 ## REST API
 
 Get a token, then call the data endpoints with `Authorization: Bearer <token>`.
