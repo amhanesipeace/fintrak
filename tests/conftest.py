@@ -39,6 +39,17 @@ def client(app):
 
 
 @pytest.fixture()
+def db_session(app):
+    """Direct DB access with a fresh schema per test (for model-level tests)."""
+    from extensions import db
+    with app.app_context():
+        db.drop_all()
+        db.create_all()
+        yield db
+        db.session.remove()
+
+
+@pytest.fixture()
 def auth_headers(client):
     """Register a user via the API and return JWT Authorization headers."""
     resp = client.post("/api/auth/register",
