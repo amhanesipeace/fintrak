@@ -11,3 +11,11 @@ instance/
 .vscode/
 .idea/
 README.md
+
+# Test / dev files — not needed in the runtime image
+tests/
+requirements-dev.txt
+pytest.ini
+.pytest_cache/
+.coverage
+htmlcov/
