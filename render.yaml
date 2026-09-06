@@ -31,7 +31,7 @@ services:
       - key: SEED_ON_START
         value: "1"                   # create demo/demo123 on first boot
       - key: WEB_CONCURRENCY
-        value: "2"                   # gunicorn workers (fits 512 MB free RAM)
+        value: "1"                   # single worker: avoids create_all race, fits 512 MB free RAM
       - key: QUOTE_CACHE_TTL
         value: "60"
       - key: DATABASE_URL

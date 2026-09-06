@@ -54,7 +54,15 @@ def create_app(config_object=Config):
 
     # Create tables on first run (no-op if they already exist).
     with app.app_context():
-        db.create_all()
+        try:
+            db.create_all()
+        except Exception as exc:
+            # If several workers boot at once on a fresh database they can race
+            # to CREATE TABLE (Postgres raises a duplicate pg_type). Tolerate it:
+            # whichever worker lost the race just continues against the schema
+            # the winner created.
+            db.session.rollback()
+            app.logger.warning("db.create_all() race tolerated: %s", exc)
 
         # Optional one-time demo seed for shell-less deploys (Render free tier).
         if os.environ.get("SEED_ON_START") == "1":
