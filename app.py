@@ -1,7 +1,7 @@
 """Application factory for FinTrak — full-stack financial management SaaS."""
 import os
 
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 
 from config import Config
 from extensions import db, login_manager, bcrypt, jwt
@@ -51,6 +51,25 @@ def create_app(config_object=Config):
             db_ok = False
         return jsonify({"status": "ok" if db_ok else "degraded",
                         "db": db_ok, "redis": cache.ping()}), (200 if db_ok else 503)
+
+    # Return JSON (not HTML) for errors on the REST API; web pages keep HTML.
+    @app.errorhandler(404)
+    def _not_found(err):
+        if request.path.startswith("/api/"):
+            return jsonify({"error": "not found"}), 404
+        return err
+
+    @app.errorhandler(405)
+    def _method_not_allowed(err):
+        if request.path.startswith("/api/"):
+            return jsonify({"error": "method not allowed"}), 405
+        return err
+
+    @app.errorhandler(500)
+    def _server_error(err):
+        if request.path.startswith("/api/"):
+            return jsonify({"error": "internal server error"}), 500
+        return "Internal Server Error", 500
 
     # Create tables on first run (no-op if they already exist).
     with app.app_context():
