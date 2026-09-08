@@ -1,5 +1,9 @@
 # 💰 FinTrak — Full-Stack Financial Management SaaS
 
+[![CI](https://github.com/amhanesipeace/fintrak/actions/workflows/ci.yml/badge.svg)](https://github.com/amhanesipeace/fintrak/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+![Python](https://img.shields.io/badge/python-3.12-blue.svg)
+
 A full-stack personal-finance platform built with **Flask** and **SQLAlchemy**.
 It tracks income/expenses, values a live **stock portfolio**, exposes a
 **JWT-secured REST API**, and offloads market-data work to **Celery** with
