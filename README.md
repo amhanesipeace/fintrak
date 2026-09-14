@@ -80,11 +80,15 @@ Redis, so no PostgreSQL, Redis, or network access is required.
 
 ```bash
 pip install -r requirements-dev.txt
-pytest
+pytest                                   # run the suite
+pytest --cov=. --cov-report=term-missing # with a coverage report
 ```
 
-Covers the health probe and routing, JWT + session authentication, and the
-data models (bcrypt hashing, constraints, cascade deletes, serialization).
+79 tests covering the health probe and routing, JWT + session authentication,
+the data models (bcrypt hashing, constraints, cascade deletes, serialization),
+the REST + web endpoints, Matplotlib chart rendering, the market/cache layer
+(provider fallback + Redis), the demo seeder, and the Celery tasks —
+**~93% line coverage**. CI enforces a 90% floor.
 
 ## REST API
 
