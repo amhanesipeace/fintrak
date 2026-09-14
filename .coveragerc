@@ -1,0 +1,13 @@
+# Coverage configuration.
+[run]
+omit =
+    tests/*
+    .venv/*
+
+[report]
+show_missing = True
+# Lines that don't need test coverage:
+exclude_lines =
+    pragma: no cover
+    if __name__ == .__main__.:
+    raise NotImplementedError

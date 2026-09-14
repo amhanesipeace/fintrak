@@ -2,4 +2,5 @@
 -r requirements.txt
 
 pytest>=8.0
-pytest-mock>=3.12      # convenient mocker fixture for later API/market tests
+pytest-mock>=3.12      # convenient mocker fixture for API/market tests
+pytest-cov>=5.0        # coverage reporting (pytest --cov)
