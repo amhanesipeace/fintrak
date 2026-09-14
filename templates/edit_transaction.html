@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Edit transaction · FinTrack{% endblock %}
+{% block content %}
+<h1 class="page-title">Edit transaction</h1>
+
+<div class="card">
+  <form class="row-form" method="post"
+        action="{{ url_for('main.edit_transaction', tid=txn.id) }}">
+    <label>Type
+      <select name="type" required>
+        <option value="expense" {{ 'selected' if txn.type=='expense' }}>Expense</option>
+        <option value="income"  {{ 'selected' if txn.type=='income'  }}>Income</option>
+      </select>
+    </label>
+    <label>Amount
+      <input name="amount" type="number" step="0.01" min="0.01"
+             value="{{ '%.2f'|format(txn.amount) }}" required>
+    </label>
+    <label>Category
+      <select name="category">
+        {% for c in categories %}
+        <option value="{{ c }}" {{ 'selected' if c==txn.category }}>{{ c }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Date
+      <input name="date" type="date" value="{{ txn.date.isoformat() }}">
+    </label>
+    <label class="grow">Note
+      <input name="note" type="text" value="{{ txn.note or '' }}" placeholder="optional">
+    </label>
+    <button class="btn" type="submit">Save</button>
+    <a class="btn-ghost" href="{{ url_for('main.transactions') }}">Cancel</a>
+  </form>
+</div>
+{% endblock %}

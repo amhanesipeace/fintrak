@@ -140,6 +140,35 @@ def delete_transaction(tid):
     return jsonify({"deleted": tid})
 
 
+@api.route("/transactions/<int:tid>", methods=["PUT", "PATCH"])
+@auth_required
+def update_transaction(tid):
+    txn = Transaction.query.filter_by(id=tid, user_id=g.user_id).first()
+    if not txn:
+        return jsonify({"error": "not found"}), 404
+
+    data = request.get_json(force=True, silent=True) or {}
+    try:
+        # Partial update: fields absent from the body keep their current value,
+        # but the resulting transaction must still be valid.
+        t_type = data.get("type", txn.type)
+        amount = float(data.get("amount", txn.amount))
+        if t_type not in ("income", "expense") or amount <= 0:
+            raise ValueError
+        if data.get("date"):
+            txn.date = datetime.strptime(data["date"], "%Y-%m-%d").date()
+        txn.type = t_type
+        txn.amount = round(amount, 2)
+        txn.category = data.get("category", txn.category)
+        if "note" in data:
+            txn.note = data["note"]
+        db.session.commit()
+        return jsonify(txn.to_dict())
+    except (KeyError, ValueError, TypeError):
+        db.session.rollback()
+        return jsonify({"error": "invalid payload"}), 400
+
+
 @api.route("/quotes")
 @auth_required
 def quotes():

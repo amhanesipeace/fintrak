@@ -81,6 +81,33 @@ def delete_transaction(tid):
     return redirect(url_for("main.transactions"))
 
 
+@main.route("/transactions/<int:tid>/edit", methods=["GET", "POST"])
+@login_required
+def edit_transaction(tid):
+    txn = Transaction.query.filter_by(id=tid, user_id=current_user.id).first_or_404()
+    if request.method == "POST":
+        try:
+            t_type = request.form.get("type")
+            amount = float(request.form.get("amount", ""))
+            category = request.form.get("category") or "Other"
+            note = request.form.get("note", "").strip()
+            d_raw = request.form.get("date") or date.today().isoformat()
+            d = datetime.strptime(d_raw, "%Y-%m-%d").date()
+            if t_type not in ("income", "expense") or amount <= 0:
+                raise ValueError("bad input")
+            txn.type = t_type
+            txn.amount = round(amount, 2)
+            txn.category = category
+            txn.note = note
+            txn.date = d
+            db.session.commit()
+            flash("Transaction updated.", "success")
+            return redirect(url_for("main.transactions"))
+        except Exception:
+            flash("Please enter a valid amount, type and date.", "error")
+    return render_template("edit_transaction.html", txn=txn, categories=CATEGORIES)
+
+
 @main.route("/portfolio")
 @login_required
 def portfolio():

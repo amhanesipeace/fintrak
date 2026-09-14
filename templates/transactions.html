@@ -45,7 +45,9 @@
         <td class="r {{ 'pos' if t.type=='income' else 'neg' }}">
           {{ '+' if t.type=='income' else '−' }}{{ t.amount|money }}
         </td>
-        <td class="r">
+        <td class="r actions">
+          <a class="btn-ghost" href="{{ url_for('main.edit_transaction', tid=t.id) }}"
+             title="Edit">Edit</a>
           <form method="post" action="{{ url_for('main.delete_transaction', tid=t.id) }}"
                 onsubmit="return confirm('Delete this transaction?');">
             <button class="btn-del" title="Delete">✕</button>
