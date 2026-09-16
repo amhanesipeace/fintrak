@@ -121,15 +121,59 @@ curl -X POST http://localhost:8000/api/transactions \
 | `GET  /api/quotes?symbols=AAPL,MSFT` | Live stock quotes (cached) |
 | `GET  /api/portfolio` | Valued holdings + total |
 
-## Performance notes
+## Performance (measured)
 
-- **Indexing**: composite `ix_txn_user_date` and `ix_holding_user_symbol`
-  match the hottest queries; foreign keys are indexed.
-- **Connection pooling**: `pool_size`, `max_overflow`, `pool_recycle` and
-  `pool_pre_ping` are configured for PostgreSQL in `config.py`.
-- **Redis caching + Celery**: quotes are cached with a TTL and pre-warmed by a
-  beat task, so portfolio pages render from cache rather than blocking on
-  external APIs.
+Benchmarked with [`benchmark.py`](benchmark.py) on **PostgreSQL 16 + Redis**,
+5,000 transactions, 200 iterations. Reported as **median / p95**.
+
+**Database query latency** (server-side ORM against PostgreSQL, indexed + pooled):
+
+| query | median | p95 |
+|-------|-------:|----:|
+| `SUM(expense)` aggregation | 0.56 ms | 0.60 ms |
+| recent transactions (indexed, limit 8) | 0.55 ms | 0.58 ms |
+| user holdings lookup | 0.23 ms | 0.27 ms |
+
+→ all **well under 100 ms**.
+
+**API response latency** (server-side processing via the Flask test client):
+
+| endpoint | median | p95 |
+|----------|-------:|----:|
+| `GET /api/summary` | 4.41 ms | 6.88 ms |
+| `GET /api/portfolio` (cached quotes) | 2.29 ms | 3.27 ms |
+
+→ all **far under 2 s**.
+
+**Why caching matters** — one quote fetch, cold vs warm:
+
+| quote fetch | latency |
+|-------------|--------:|
+| cold (live Alpha Vantage / Yahoo) | ~695 ms / symbol |
+| warm (Redis cache) | ~0.6 ms |
+
+A multi-holding portfolio would otherwise serialize several ~0.7 s external
+calls (easily >2 s). Redis caching + a Celery beat job that pre-warms the cache
+keep it in the low-millisecond range — **~1,200× faster** on the warm path.
+
+**Reproduce:**
+
+```bash
+docker compose up -d db redis
+DATABASE_URL=postgresql://fintrak:fintrak@localhost:5432/fintrak \
+REDIS_URL=redis://localhost:6379/0 \
+python benchmark.py --transactions 5000 --iterations 200
+```
+
+*Methodology: query timings measure ORM execution against PostgreSQL; API
+timings use Flask's test client (server-side, excludes network + gunicorn);
+figures are median and p95 over many iterations.*
+
+**How this maps to the design:** composite index `ix_txn_user_date` and
+`ix_holding_user_symbol` serve the hottest queries; connection pooling
+(`pool_size`/`max_overflow`/`pool_recycle`/`pool_pre_ping`) avoids per-request
+connection setup; Redis caching + Celery keep responses off the slow external-API
+path.
 
 ## Security notes
 

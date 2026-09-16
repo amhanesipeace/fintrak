@@ -3,6 +3,7 @@
 omit =
     tests/*
     .venv/*
+    benchmark.py
 
 [report]
 show_missing = True
