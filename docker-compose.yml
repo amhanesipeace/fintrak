@@ -29,8 +29,11 @@ services:
 
   web:
     build: .
+    # Apply DB migrations, then serve. `exec` keeps gunicorn as PID 1 for signals.
+    command: sh -c "flask db upgrade && exec gunicorn --bind 0.0.0.0:8000 --workers $${WEB_CONCURRENCY:-2} --timeout 60 app:app"
     env_file: .env
     environment:
+      FLASK_APP: app
       DATABASE_URL: postgresql://${POSTGRES_USER:-fintrak}:${POSTGRES_PASSWORD:-fintrak}@db:5432/${POSTGRES_DB:-fintrak}
       REDIS_URL: redis://redis:6379/0
     depends_on:

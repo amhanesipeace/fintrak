@@ -4,7 +4,7 @@ import os
 from flask import Flask, jsonify, request
 
 from config import Config
-from extensions import db, login_manager, bcrypt, jwt
+from extensions import db, login_manager, bcrypt, jwt, migrate
 
 
 def create_app(config_object=Config):
@@ -16,6 +16,7 @@ def create_app(config_object=Config):
     bcrypt.init_app(app)
     jwt.init_app(app)
     login_manager.init_app(app)
+    migrate.init_app(app, db)   # `flask db ...` commands (Alembic)
 
     # Import models so SQLAlchemy is aware of them, then wire the user loader.
     from models import User
@@ -71,17 +72,12 @@ def create_app(config_object=Config):
             return jsonify({"error": "internal server error"}), 500
         return "Internal Server Error", 500
 
-    # Create tables on first run (no-op if they already exist).
     with app.app_context():
-        try:
+        # SQLite (tests / zero-config local dev): create tables directly.
+        # PostgreSQL (production): the schema is managed by Alembic migrations
+        # — run `flask db upgrade` (done at container start), NOT create_all().
+        if app.config["SQLALCHEMY_DATABASE_URI"].startswith("sqlite"):
             db.create_all()
-        except Exception as exc:
-            # If several workers boot at once on a fresh database they can race
-            # to CREATE TABLE (Postgres raises a duplicate pg_type). Tolerate it:
-            # whichever worker lost the race just continues against the schema
-            # the winner created.
-            db.session.rollback()
-            app.logger.warning("db.create_all() race tolerated: %s", exc)
 
         # Optional one-time demo seed for shell-less deploys (Render free tier).
         if os.environ.get("SEED_ON_START") == "1":
