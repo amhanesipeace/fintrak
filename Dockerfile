@@ -4,7 +4,8 @@ FROM python:3.12-slim
 # Faster, cleaner Python in containers.
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PIP_NO_CACHE_DIR=1
+    PIP_NO_CACHE_DIR=1 \
+    FLASK_APP=app
 
 WORKDIR /app
 
@@ -25,8 +26,6 @@ USER appuser
 
 EXPOSE 8000
 
-# Default command runs the web server; worker/beat override this in compose.
-# Shell form so $PORT (set by Render/other PaaS) and $WEB_CONCURRENCY expand;
-# both fall back to sensible local defaults. `exec` replaces the shell with
-# gunicorn so it receives SIGTERM directly for graceful shutdown.
-CMD exec gunicorn --bind 0.0.0.0:${PORT:-8000} --workers ${WEB_CONCURRENCY:-2} --timeout 60 app:app
+# Web default: run migrations (adopting a pre-migrations DB if needed) then
+# serve. worker/beat override this with their own celery command.
+CMD ["sh", "/app/docker-entrypoint.sh"]
