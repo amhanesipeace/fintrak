@@ -30,6 +30,9 @@ class User(UserMixin, db.Model):
     holdings = db.relationship(
         "Holding", backref="user", lazy=True, cascade="all, delete-orphan"
     )
+    budgets = db.relationship(
+        "Budget", backref="user", lazy=True, cascade="all, delete-orphan"
+    )
 
     def set_password(self, password):
         # bcrypt returns bytes; store as utf-8 string.
@@ -95,3 +98,24 @@ class Holding(db.Model):
             "name": self.name,
             "quantity": self.quantity,
         }
+
+
+class Budget(db.Model):
+    """A user's monthly spending limit for one category."""
+    __tablename__ = "budgets"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(
+        db.Integer, db.ForeignKey("users.id"), nullable=False, index=True
+    )
+    category = db.Column(db.String(50), nullable=False)
+    amount = db.Column(db.Float, nullable=False)             # monthly limit
+    created_at = db.Column(db.DateTime, default=utcnow)
+
+    # One budget per (user, category).
+    __table_args__ = (
+        db.UniqueConstraint("user_id", "category", name="uq_budget_user_category"),
+    )
+
+    def to_dict(self):
+        return {"id": self.id, "category": self.category, "amount": self.amount}

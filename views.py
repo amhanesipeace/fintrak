@@ -9,7 +9,8 @@ from sqlalchemy import func
 import charts
 import market
 from extensions import db
-from models import Transaction, Holding
+from models import Transaction, Holding, Budget
+from queries import current_month_spending
 
 main = Blueprint("main", __name__)
 
@@ -154,6 +155,57 @@ def delete_holding(hid):
     db.session.commit()
     flash("Holding removed.", "success")
     return redirect(url_for("main.portfolio"))
+
+
+@main.route("/budgets")
+@login_required
+def budgets():
+    spending = current_month_spending(current_user.id)
+    rows = []
+    for b in (Budget.query.filter_by(user_id=current_user.id)
+              .order_by(Budget.category).all()):
+        spent = spending.get(b.category, 0.0)
+        rows.append({
+            "b": b,
+            "spent": spent,
+            "remaining": b.amount - spent,
+            "percent": min(100, round(100 * spent / b.amount)) if b.amount else 0,
+            "over": spent > b.amount,
+        })
+    return render_template("budgets.html", rows=rows, categories=CATEGORIES)
+
+
+@main.route("/budgets/add", methods=["POST"])
+@login_required
+def add_budget():
+    category = request.form.get("category") or "Other"
+    try:
+        amount = float(request.form.get("amount", ""))
+        if amount <= 0:
+            raise ValueError("bad input")
+        # Web convenience: setting a budget for an existing category updates it.
+        existing = Budget.query.filter_by(user_id=current_user.id,
+                                          category=category).first()
+        if existing:
+            existing.amount = round(amount, 2)
+        else:
+            db.session.add(Budget(user_id=current_user.id, category=category,
+                                  amount=round(amount, 2)))
+        db.session.commit()
+        flash("Budget saved.", "success")
+    except Exception:
+        flash("Please enter a valid amount.", "error")
+    return redirect(url_for("main.budgets"))
+
+
+@main.route("/budgets/<int:bid>/delete", methods=["POST"])
+@login_required
+def delete_budget(bid):
+    b = Budget.query.filter_by(id=bid, user_id=current_user.id).first_or_404()
+    db.session.delete(b)
+    db.session.commit()
+    flash("Budget removed.", "success")
+    return redirect(url_for("main.budgets"))
 
 
 @main.route("/charts/spending.png")

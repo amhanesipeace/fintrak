@@ -130,3 +130,10 @@ input:focus, select:focus { border-color: var(--accent); }
   .nav { gap: 12px; padding: 12px 16px; flex-wrap: wrap; }
   .container { padding: 16px; }
 }
+
+/* Budget progress bars */
+.progress { background: var(--panel2); border: 1px solid var(--line);
+  border-radius: 20px; height: 12px; overflow: hidden; min-width: 140px; }
+.progress > span { display: block; height: 100%; background: var(--green);
+  border-radius: 20px; transition: width .3s; }
+.progress.over > span { background: var(--red); }

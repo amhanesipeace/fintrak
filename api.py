@@ -22,7 +22,8 @@ from sqlalchemy import func
 
 import market
 from extensions import db
-from models import Transaction, Holding, User
+from models import Transaction, Holding, User, Budget
+from queries import current_month_spending
 from security import auth_required
 
 api = Blueprint("api", __name__, url_prefix="/api")
@@ -191,3 +192,76 @@ def portfolio():
         rows.append({**h.to_dict(), "price": price, "value": round(value, 2)})
     rows.sort(key=lambda r: r["value"], reverse=True)
     return jsonify({"total": round(total, 2), "holdings": rows})
+
+
+# --------------------------------------------------------------------------- #
+#  Budgets (monthly spending limits per category)
+# --------------------------------------------------------------------------- #
+def _budget_status(budget, spending):
+    spent = spending.get(budget.category, 0.0)
+    return {
+        **budget.to_dict(),
+        "spent": round(spent, 2),
+        "remaining": round(budget.amount - spent, 2),
+        "percent": round(100 * spent / budget.amount, 1) if budget.amount else 0.0,
+        "over_budget": spent > budget.amount,
+    }
+
+
+@api.route("/budgets")
+@auth_required
+def list_budgets():
+    spending = current_month_spending(g.user_id)
+    budgets = (Budget.query.filter_by(user_id=g.user_id)
+               .order_by(Budget.category).all())
+    return jsonify([_budget_status(b, spending) for b in budgets])
+
+
+@api.route("/budgets", methods=["POST"])
+@auth_required
+def create_budget():
+    data = request.get_json(silent=True) or {}
+    category = (data.get("category") or "").strip()
+    try:
+        amount = float(data["amount"])
+        if not category or amount <= 0:
+            raise ValueError
+    except (KeyError, ValueError, TypeError):
+        return jsonify({"error": "invalid payload"}), 400
+    if Budget.query.filter_by(user_id=g.user_id, category=category).first():
+        return jsonify({"error": "budget for this category already exists"}), 409
+    budget = Budget(user_id=g.user_id, category=category, amount=round(amount, 2))
+    db.session.add(budget)
+    db.session.commit()
+    return jsonify(budget.to_dict()), 201
+
+
+@api.route("/budgets/<int:bid>", methods=["PUT", "PATCH"])
+@auth_required
+def update_budget(bid):
+    budget = Budget.query.filter_by(id=bid, user_id=g.user_id).first()
+    if not budget:
+        return jsonify({"error": "not found"}), 404
+    data = request.get_json(silent=True) or {}
+    try:
+        amount = float(data.get("amount", budget.amount))
+        if amount <= 0:
+            raise ValueError
+    except (ValueError, TypeError):
+        return jsonify({"error": "invalid payload"}), 400
+    budget.amount = round(amount, 2)
+    if data.get("category"):
+        budget.category = data["category"].strip()
+    db.session.commit()
+    return jsonify(budget.to_dict())
+
+
+@api.route("/budgets/<int:bid>", methods=["DELETE"])
+@auth_required
+def delete_budget(bid):
+    budget = Budget.query.filter_by(id=bid, user_id=g.user_id).first()
+    if not budget:
+        return jsonify({"error": "not found"}), 404
+    db.session.delete(budget)
+    db.session.commit()
+    return jsonify({"deleted": bid})
