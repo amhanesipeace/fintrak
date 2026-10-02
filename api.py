@@ -125,9 +125,45 @@ def transactions():
         except (KeyError, ValueError, TypeError):
             return jsonify({"error": "invalid payload"}), 400
 
-    txns = (Transaction.query.filter_by(user_id=g.user_id)
-            .order_by(Transaction.date.desc(), Transaction.id.desc()).all())
-    return jsonify([t.to_dict() for t in txns])
+    # GET: paginated + filterable list.
+    # Query params: page, per_page, type, category, from (YYYY-MM-DD), to.
+    query = Transaction.query.filter_by(user_id=g.user_id)
+
+    t_type = request.args.get("type")
+    if t_type in ("income", "expense"):
+        query = query.filter_by(type=t_type)
+
+    category = request.args.get("category")
+    if category:
+        query = query.filter_by(category=category)
+
+    try:
+        if request.args.get("from"):
+            query = query.filter(Transaction.date >= datetime.strptime(
+                request.args["from"], "%Y-%m-%d").date())
+        if request.args.get("to"):
+            query = query.filter(Transaction.date <= datetime.strptime(
+                request.args["to"], "%Y-%m-%d").date())
+    except ValueError:
+        return jsonify({"error": "invalid date (use YYYY-MM-DD)"}), 400
+
+    try:
+        page = max(1, int(request.args.get("page", 1)))
+        per_page = min(200, max(1, int(request.args.get("per_page", 50))))
+    except ValueError:
+        return jsonify({"error": "invalid page/per_page"}), 400
+
+    query = query.order_by(Transaction.date.desc(), Transaction.id.desc())
+    total = query.count()
+    items = query.offset((page - 1) * per_page).limit(per_page).all()
+
+    return jsonify({
+        "items": [t.to_dict() for t in items],
+        "page": page,
+        "per_page": per_page,
+        "total": total,
+        "pages": (total + per_page - 1) // per_page,
+    })
 
 
 @api.route("/transactions/<int:tid>", methods=["DELETE"])

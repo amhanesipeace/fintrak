@@ -42,7 +42,9 @@ def test_list_transactions(client, auth_headers):
                 json={"type": "expense", "amount": 40, "category": "Food"})
     resp = client.get("/api/transactions", headers=auth_headers)
     assert resp.status_code == 200
-    assert len(resp.get_json()) == 2
+    body = resp.get_json()
+    assert len(body["items"]) == 2
+    assert body["total"] == 2
 
 
 def test_transactions_require_auth(client):
@@ -56,7 +58,7 @@ def test_delete_transaction(client, auth_headers):
     resp = client.delete(f"/api/transactions/{tid}", headers=auth_headers)
     assert resp.status_code == 200
     assert resp.get_json() == {"deleted": tid}
-    assert client.get("/api/transactions", headers=auth_headers).get_json() == []
+    assert client.get("/api/transactions", headers=auth_headers).get_json()["items"] == []
 
 
 def test_delete_missing_transaction(client, auth_headers):
@@ -79,6 +81,6 @@ def test_users_are_isolated(client, auth_headers):
                       json={"type": "income", "amount": 500, "category": "Salary"}
                       ).get_json()["id"]
     other = _headers(client, "intruder")
-    assert client.get("/api/transactions", headers=other).get_json() == []
+    assert client.get("/api/transactions", headers=other).get_json()["items"] == []
     assert client.delete(f"/api/transactions/{tid}", headers=other).status_code == 404
     assert client.get("/api/summary", headers=other).get_json()["income"] == 0.0

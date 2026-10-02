@@ -30,7 +30,7 @@ def test_add_and_delete_transaction_web(client):
     assert b"Food" in client.get("/transactions").data
 
     # Find its id (the API accepts the same session), then delete via the form.
-    tid = client.get("/api/transactions").get_json()[0]["id"]
+    tid = client.get("/api/transactions").get_json()["items"][0]["id"]
     resp = client.post(f"/transactions/{tid}/delete", follow_redirects=True)
     assert b"Transaction deleted" in resp.data
 

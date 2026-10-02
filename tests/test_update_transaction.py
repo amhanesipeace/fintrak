@@ -77,7 +77,7 @@ def test_edit_page_is_prefilled(client):
     client.post("/transactions/add",
                 data={"type": "expense", "amount": "12.50", "category": "Food",
                       "note": "lunch", "date": "2026-01-15"})
-    tid = client.get("/api/transactions").get_json()[0]["id"]
+    tid = client.get("/api/transactions").get_json()["items"][0]["id"]
     resp = client.get(f"/transactions/{tid}/edit")
     assert resp.status_code == 200
     assert b"Edit transaction" in resp.data
@@ -90,7 +90,7 @@ def test_edit_updates_transaction_web(client):
     client.post("/transactions/add",
                 data={"type": "expense", "amount": "12.50", "category": "Food",
                       "date": "2026-01-15"})
-    tid = client.get("/api/transactions").get_json()[0]["id"]
+    tid = client.get("/api/transactions").get_json()["items"][0]["id"]
     resp = client.post(f"/transactions/{tid}/edit",
                        data={"type": "expense", "amount": "20.00",
                              "category": "Transport", "date": "2026-01-16"},
@@ -103,7 +103,7 @@ def test_edit_invalid_web(client):
     _register(client)
     client.post("/transactions/add",
                 data={"type": "expense", "amount": "12.50", "category": "Food"})
-    tid = client.get("/api/transactions").get_json()[0]["id"]
+    tid = client.get("/api/transactions").get_json()["items"][0]["id"]
     resp = client.post(f"/transactions/{tid}/edit",
                        data={"type": "expense", "amount": "abc"},
                        follow_redirects=True)

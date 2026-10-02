@@ -116,7 +116,8 @@ curl -X POST http://localhost:8000/api/transactions \
 | `POST /api/auth/refresh` | New access token (send refresh token) |
 | `GET  /api/me` | Current user |
 | `GET  /api/summary` | Income, expense, balance |
-| `GET/POST /api/transactions` | List / create transactions |
+| `GET/POST /api/transactions` | List (paginated + filterable) / create transactions |
+| `GET /api/transactions?page=&per_page=&type=&category=&from=&to=` | Filtered, paged list |
 | `DELETE /api/transactions/<id>` | Delete a transaction |
 | `GET  /api/quotes?symbols=AAPL,MSFT` | Live stock quotes (cached) |
 | `GET  /api/portfolio` | Valued holdings + total |
