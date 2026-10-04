@@ -15,7 +15,10 @@ Data (JWT bearer token OR session cookie):
 """
 from datetime import date, datetime
 
-from flask import Blueprint, jsonify, request, g
+import csv
+import io
+
+from flask import Blueprint, jsonify, request, g, Response
 from flask_jwt_extended import (create_access_token, create_refresh_token,
                                 jwt_required, get_jwt_identity)
 from sqlalchemy import func
@@ -103,6 +106,52 @@ def summary():
                     "balance": income - expense})
 
 
+def _filtered_tx_query():
+    """Build the current user's transaction query from request filters
+    (type, category, from/to dates). Returns None if a date is malformed."""
+    query = Transaction.query.filter_by(user_id=g.user_id)
+
+    t_type = request.args.get("type")
+    if t_type in ("income", "expense"):
+        query = query.filter_by(type=t_type)
+
+    category = request.args.get("category")
+    if category:
+        query = query.filter_by(category=category)
+
+    try:
+        if request.args.get("from"):
+            query = query.filter(Transaction.date >= datetime.strptime(
+                request.args["from"], "%Y-%m-%d").date())
+        if request.args.get("to"):
+            query = query.filter(Transaction.date <= datetime.strptime(
+                request.args["to"], "%Y-%m-%d").date())
+    except ValueError:
+        return None
+
+    return query.order_by(Transaction.date.desc(), Transaction.id.desc())
+
+
+@api.route("/transactions.csv")
+@auth_required
+def transactions_csv():
+    """Export the user's transactions as CSV (respects the same filters)."""
+    query = _filtered_tx_query()
+    if query is None:
+        return jsonify({"error": "invalid date (use YYYY-MM-DD)"}), 400
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["date", "type", "category", "amount", "note"])
+    for t in query.all():
+        writer.writerow([t.date.isoformat(), t.type, t.category,
+                         f"{t.amount:.2f}", t.note or ""])
+
+    return Response(buf.getvalue(), mimetype="text/csv",
+                    headers={"Content-Disposition":
+                             "attachment; filename=transactions.csv"})
+
+
 @api.route("/transactions", methods=["GET", "POST"])
 @auth_required
 def transactions():
@@ -126,25 +175,8 @@ def transactions():
             return jsonify({"error": "invalid payload"}), 400
 
     # GET: paginated + filterable list.
-    # Query params: page, per_page, type, category, from (YYYY-MM-DD), to.
-    query = Transaction.query.filter_by(user_id=g.user_id)
-
-    t_type = request.args.get("type")
-    if t_type in ("income", "expense"):
-        query = query.filter_by(type=t_type)
-
-    category = request.args.get("category")
-    if category:
-        query = query.filter_by(category=category)
-
-    try:
-        if request.args.get("from"):
-            query = query.filter(Transaction.date >= datetime.strptime(
-                request.args["from"], "%Y-%m-%d").date())
-        if request.args.get("to"):
-            query = query.filter(Transaction.date <= datetime.strptime(
-                request.args["to"], "%Y-%m-%d").date())
-    except ValueError:
+    query = _filtered_tx_query()
+    if query is None:
         return jsonify({"error": "invalid date (use YYYY-MM-DD)"}), 400
 
     try:

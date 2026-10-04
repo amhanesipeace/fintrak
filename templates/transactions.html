@@ -31,7 +31,11 @@
 </div>
 
 <div class="card">
-  <div class="card-head"><h2>History</h2></div>
+  <div class="card-head">
+    <h2>History</h2>
+    {% if txns %}<a class="btn-ghost" href="{{ url_for('api.transactions_csv') }}"
+       title="Download all transactions as CSV">⬇ Export CSV</a>{% endif %}
+  </div>
   {% if txns %}
   <table class="table">
     <thead><tr><th>Date</th><th>Type</th><th>Category</th><th>Note</th><th class="r">Amount</th><th></th></tr></thead>
