@@ -24,7 +24,7 @@ from flask_jwt_extended import (create_access_token, create_refresh_token,
 from sqlalchemy import func
 
 import market
-from extensions import db
+from extensions import db, limiter
 from models import Transaction, Holding, User, Budget
 from queries import current_month_spending
 from security import auth_required
@@ -45,6 +45,7 @@ def _tokens(user):
 
 
 @api.route("/auth/register", methods=["POST"])
+@limiter.limit("5 per hour")
 def register():
     data = request.get_json(silent=True) or {}
     username = (data.get("username") or "").strip()
@@ -68,6 +69,7 @@ def register():
 
 
 @api.route("/auth/login", methods=["POST"])
+@limiter.limit("10 per minute")
 def login():
     data = request.get_json(silent=True) or {}
     user = User.query.filter_by(username=(data.get("username") or "").strip()).first()

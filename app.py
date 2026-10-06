@@ -4,7 +4,7 @@ import os
 from flask import Flask, jsonify, request
 
 from config import Config
-from extensions import db, login_manager, bcrypt, jwt, migrate
+from extensions import db, login_manager, bcrypt, jwt, migrate, limiter
 
 
 def create_app(config_object=Config):
@@ -17,6 +17,12 @@ def create_app(config_object=Config):
     jwt.init_app(app)
     login_manager.init_app(app)
     migrate.init_app(app, db)   # `flask db ...` commands (Alembic)
+    # Read rate-limit settings from the env at app-build time so they can be
+    # overridden per process/test without import-order surprises.
+    app.config["RATELIMIT_ENABLED"] = os.environ.get("RATELIMIT_ENABLED", "1") != "0"
+    app.config["RATELIMIT_STORAGE_URI"] = os.environ.get(
+        "RATELIMIT_STORAGE_URI", app.config.get("REDIS_URL"))
+    limiter.init_app(app)       # brute-force protection on auth routes
 
     # Import models so SQLAlchemy is aware of them, then wire the user loader.
     from models import User
@@ -65,6 +71,12 @@ def create_app(config_object=Config):
         if request.path.startswith("/api/"):
             return jsonify({"error": "method not allowed"}), 405
         return err
+
+    @app.errorhandler(429)
+    def _rate_limited(err):
+        if request.path.startswith("/api/"):
+            return jsonify({"error": "too many requests — slow down"}), 429
+        return "Too Many Requests", 429
 
     @app.errorhandler(500)
     def _server_error(err):

@@ -17,6 +17,10 @@ os.environ["REDIS_URL"] = "redis://localhost:6399/0"   # unreachable -> no-op ca
 os.environ["SECRET_KEY"] = "test-secret"
 os.environ["JWT_SECRET_KEY"] = "test-jwt-secret-key-at-least-32-bytes-long"
 os.environ.pop("SEED_ON_START", None)                  # never auto-seed in tests
+# Rate limiting off by default in tests (and never touch Redis); the dedicated
+# rate-limit test flips it on explicitly.
+os.environ["RATELIMIT_ENABLED"] = "0"
+os.environ["RATELIMIT_STORAGE_URI"] = "memory://"
 
 
 @pytest.fixture(scope="session")

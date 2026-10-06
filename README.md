@@ -181,5 +181,9 @@ path.
 
 - Passwords are hashed with **bcrypt**; never stored in plain text.
 - API auth uses signed **JWT** access/refresh tokens.
+- **Rate limiting** on auth (Flask-Limiter, Redis-backed): `10/min` on login and
+  `5/hour` on register per IP, to blunt brute-force/credential-stuffing. Returns
+  `429` (JSON on `/api`); fails open if Redis is briefly unavailable. Tunable via
+  `RATELIMIT_ENABLED` / `RATELIMIT_STORAGE_URI`.
 - Set strong `SECRET_KEY` / `JWT_SECRET_KEY` in `.env` for anything non-local.
 - The portfolio tracks quantities only — no real funds or brokerage access.

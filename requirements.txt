@@ -3,6 +3,7 @@ Flask>=3.0
 Flask-SQLAlchemy>=3.1
 Flask-Login>=0.6                 # secure server-side sessions (web UI)
 Flask-Migrate>=4.0              # Alembic schema migrations
+Flask-Limiter>=3.5              # rate limiting (brute-force protection on auth)
 SQLAlchemy>=2.0
 
 # Auth: JWT for the REST API, bcrypt for password hashing

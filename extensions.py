@@ -4,8 +4,14 @@ from flask_login import LoginManager
 from flask_bcrypt import Bcrypt
 from flask_jwt_extended import JWTManager
 from flask_migrate import Migrate
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 db = SQLAlchemy()
+
+# Rate limiting (brute-force protection on auth), backed by Redis in prod.
+# Storage URI and enabled-flag come from app config (RATELIMIT_* keys).
+limiter = Limiter(key_func=get_remote_address)
 
 # Alembic-based schema migrations (flask db init/migrate/upgrade)
 migrate = Migrate()

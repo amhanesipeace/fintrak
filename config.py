@@ -56,6 +56,15 @@ class Config:
     CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", REDIS_URL)
     CELERY_RESULT_BACKEND = os.environ.get("CELERY_RESULT_BACKEND", REDIS_URL)
 
+    # --- Rate limiting ----------------------------------------------------
+    # Store counters in Redis in production; override with memory:// for tests.
+    RATELIMIT_STORAGE_URI = os.environ.get("RATELIMIT_STORAGE_URI", REDIS_URL)
+    RATELIMIT_ENABLED = os.environ.get("RATELIMIT_ENABLED", "1") != "0"
+    RATELIMIT_HEADERS_ENABLED = True
+    # Fail open: if the storage (Redis) is briefly unreachable, allow the
+    # request rather than erroring — availability over strict limiting.
+    RATELIMIT_SWALLOW_ERRORS = True
+
     # How long cached market quotes stay fresh (seconds).
     QUOTE_CACHE_TTL = int(os.environ.get("QUOTE_CACHE_TTL", 60))
 
