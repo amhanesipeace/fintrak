@@ -34,3 +34,11 @@ def refresh_quotes():
 def refresh_symbol(symbol):
     """Refresh a single symbol on demand (e.g. right after it's added)."""
     return {symbol: market.get_quote(symbol)}
+
+
+@celery.task(name="tasks.process_recurring")
+def process_recurring():
+    """Materialise every due recurring-transaction rule (all users)."""
+    from recurring import process_due_recurring
+    with flask_app.app_context():
+        return {"created": process_due_recurring()}

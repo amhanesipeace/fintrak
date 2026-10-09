@@ -25,8 +25,9 @@ from sqlalchemy import func
 
 import market
 from extensions import db, limiter
-from models import Transaction, Holding, User, Budget
+from models import Transaction, Holding, User, Budget, RecurringTransaction
 from queries import current_month_spending
+from recurring import process_due_recurring
 from security import auth_required
 
 api = Blueprint("api", __name__, url_prefix="/api")
@@ -335,3 +336,101 @@ def delete_budget(bid):
     db.session.delete(budget)
     db.session.commit()
     return jsonify({"deleted": bid})
+
+
+# --- Recurring transactions -------------------------------------------------
+
+@api.route("/recurring")
+@auth_required
+def list_recurring():
+    rules = (RecurringTransaction.query.filter_by(user_id=g.user_id)
+             .order_by(RecurringTransaction.next_date).all())
+    return jsonify([r.to_dict() for r in rules])
+
+
+@api.route("/recurring", methods=["POST"])
+@auth_required
+def create_recurring():
+    data = request.get_json(silent=True) or {}
+    ttype = (data.get("type") or "").strip()
+    category = (data.get("category") or "").strip()
+    frequency = (data.get("frequency") or "").strip()
+    note = (data.get("note") or "").strip() or None
+    try:
+        amount = float(data["amount"])
+        if (amount <= 0 or ttype not in ("income", "expense")
+                or not category
+                or frequency not in RecurringTransaction.FREQUENCIES):
+            raise ValueError
+    except (KeyError, ValueError, TypeError):
+        return jsonify({"error": "invalid payload"}), 400
+
+    start = data.get("start_date")
+    if start:
+        try:
+            next_date = date.fromisoformat(start)
+        except (ValueError, TypeError):
+            return jsonify({"error": "invalid start_date"}), 400
+    else:
+        next_date = date.today()
+
+    rule = RecurringTransaction(
+        user_id=g.user_id, type=ttype, amount=round(amount, 2),
+        category=category, note=note, frequency=frequency, next_date=next_date,
+    )
+    db.session.add(rule)
+    db.session.commit()
+    return jsonify(rule.to_dict()), 201
+
+
+@api.route("/recurring/<int:rid>", methods=["PUT", "PATCH"])
+@auth_required
+def update_recurring(rid):
+    rule = RecurringTransaction.query.filter_by(id=rid, user_id=g.user_id).first()
+    if not rule:
+        return jsonify({"error": "not found"}), 404
+    data = request.get_json(silent=True) or {}
+    if "amount" in data:
+        try:
+            amount = float(data["amount"])
+            if amount <= 0:
+                raise ValueError
+        except (ValueError, TypeError):
+            return jsonify({"error": "invalid payload"}), 400
+        rule.amount = round(amount, 2)
+    if data.get("category"):
+        rule.category = data["category"].strip()
+    if "note" in data:
+        rule.note = (data.get("note") or "").strip() or None
+    if data.get("frequency"):
+        if data["frequency"] not in RecurringTransaction.FREQUENCIES:
+            return jsonify({"error": "invalid payload"}), 400
+        rule.frequency = data["frequency"]
+    if "active" in data:
+        rule.active = bool(data["active"])
+    if data.get("next_date"):
+        try:
+            rule.next_date = date.fromisoformat(data["next_date"])
+        except (ValueError, TypeError):
+            return jsonify({"error": "invalid payload"}), 400
+    db.session.commit()
+    return jsonify(rule.to_dict())
+
+
+@api.route("/recurring/<int:rid>", methods=["DELETE"])
+@auth_required
+def delete_recurring(rid):
+    rule = RecurringTransaction.query.filter_by(id=rid, user_id=g.user_id).first()
+    if not rule:
+        return jsonify({"error": "not found"}), 404
+    db.session.delete(rule)
+    db.session.commit()
+    return jsonify({"deleted": rid})
+
+
+@api.route("/recurring/run", methods=["POST"])
+@auth_required
+def run_recurring():
+    """Materialise this user's due rules now (also runs daily via Celery beat)."""
+    created = process_due_recurring(user_id=g.user_id)
+    return jsonify({"created": created})

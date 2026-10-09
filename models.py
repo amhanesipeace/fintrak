@@ -119,3 +119,41 @@ class Budget(db.Model):
 
     def to_dict(self):
         return {"id": self.id, "category": self.category, "amount": self.amount}
+
+
+class RecurringTransaction(db.Model):
+    """A rule that auto-creates a Transaction on a fixed cadence.
+
+    A daily Celery task (``tasks.process_recurring``) materialises every rule
+    whose ``next_date`` has arrived into a real Transaction, then advances
+    ``next_date`` to the following occurrence. Materialisation catches up on any
+    occurrences missed while the worker was down (see ``recurring.py``).
+    """
+    __tablename__ = "recurring_transactions"
+
+    FREQUENCIES = ("daily", "weekly", "monthly")
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(
+        db.Integer, db.ForeignKey("users.id"), nullable=False, index=True
+    )
+    type = db.Column(db.String(10), nullable=False)          # "income" | "expense"
+    amount = db.Column(db.Float, nullable=False)
+    category = db.Column(db.String(50), nullable=False)
+    note = db.Column(db.String(255))
+    frequency = db.Column(db.String(10), nullable=False)     # daily|weekly|monthly
+    next_date = db.Column(db.Date, nullable=False, index=True)  # next occurrence due
+    active = db.Column(db.Boolean, nullable=False, default=True)
+    created_at = db.Column(db.DateTime, default=utcnow)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "type": self.type,
+            "amount": self.amount,
+            "category": self.category,
+            "note": self.note,
+            "frequency": self.frequency,
+            "next_date": self.next_date.isoformat() if self.next_date else None,
+            "active": self.active,
+        }

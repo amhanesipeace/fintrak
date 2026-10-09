@@ -26,5 +26,10 @@ celery.conf.update(
             "task": "tasks.refresh_quotes",
             "schedule": float(os.environ.get("QUOTE_REFRESH_SECONDS", 300)),
         },
+        # Turn due recurring-transaction rules into real transactions (daily).
+        "process-recurring": {
+            "task": "tasks.process_recurring",
+            "schedule": float(os.environ.get("RECURRING_INTERVAL_SECONDS", 86400)),
+        },
     },
 )
