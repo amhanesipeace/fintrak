@@ -92,6 +92,10 @@ the REST + web endpoints, Matplotlib chart rendering, the market/cache layer
 
 ## REST API
 
+**Interactive docs:** a Swagger UI is served at **`/api/docs`** (OpenAPI spec at
+`/api/openapi.json`) — explore every endpoint, click **Authorize** to paste a
+`Bearer <token>`, and try requests from the browser.
+
 Get a token, then call the data endpoints with `Authorization: Bearer <token>`.
 (Data endpoints also accept a browser session cookie.)
 
@@ -120,6 +124,11 @@ curl -X POST http://localhost:8000/api/transactions \
 | `GET /api/transactions?page=&per_page=&type=&category=&from=&to=` | Filtered, paged list |
 | `GET /api/transactions.csv` | Export transactions as CSV (respects filters) |
 | `DELETE /api/transactions/<id>` | Delete a transaction |
+| `GET/POST /api/budgets` | List budgets (with spending) / create a budget |
+| `PUT/DELETE /api/budgets/<id>` | Update / delete a budget |
+| `GET/POST /api/recurring` | List / create recurring rules (daily/weekly/monthly) |
+| `PUT/DELETE /api/recurring/<id>` | Update / delete a recurring rule |
+| `POST /api/recurring/run` | Materialise due rules now (also runs daily via Celery) |
 | `GET  /api/quotes?symbols=AAPL,MSFT` | Live stock quotes (cached) |
 | `GET  /api/portfolio` | Valued holdings + total |
 

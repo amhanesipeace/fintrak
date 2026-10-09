@@ -25,3 +25,6 @@ gunicorn>=21.2                  # WSGI server (Docker)
 # Visualisation & config
 matplotlib>=3.8
 python-dotenv>=1.0
+
+# API documentation (Swagger UI at /api/docs — assets bundled, no CDN)
+flasgger>=0.9.7

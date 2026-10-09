@@ -39,6 +39,24 @@ def create_app(config_object=Config):
     app.register_blueprint(main_bp)
     app.register_blueprint(api_bp)
 
+    # Interactive API docs (Swagger UI) at /api/docs, spec at /api/openapi.json.
+    # The spec is hand-authored in openapi.py (single source of truth) rather
+    # than scraped from view docstrings, so rule_filter excludes auto-scanning.
+    from flasgger import Swagger
+    from openapi import build_template
+    Swagger(app, template=build_template(), config={
+        "headers": [],
+        "specs": [{
+            "endpoint": "apispec",
+            "route": "/api/openapi.json",
+            "rule_filter": lambda rule: False,
+            "model_filter": lambda tag: True,
+        }],
+        "static_url_path": "/flasgger_static",
+        "swagger_ui": True,
+        "specs_route": "/api/docs/",
+    })
+
     # Currency formatter with thousands separators, e.g. 1234.5 -> "$1,234.50".
     @app.template_filter("money")
     def money(value):
