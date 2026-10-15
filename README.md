@@ -10,6 +10,11 @@ It tracks income/expenses, values a live **stock portfolio**, exposes a
 **Redis** caching. It runs on a **normalised PostgreSQL** schema with
 connection pooling and ships as a **Docker Compose** stack.
 
+**▶️ Live demo:** **https://fintrak-web.onrender.com** — log in with **`demo` / `demo123`**
+(free tier; the first load may take ~30s while the server wakes up).
+
+![FinTrak dashboard — balance and income/expense totals, an income-vs-expenses chart, a spending-by-category donut, and recent activity](docs/dashboard.png)
+
 ## Stack
 
 | Concern | Technology |
