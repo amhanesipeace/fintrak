@@ -103,6 +103,8 @@ a:hover { text-decoration: underline; }
 .row-form label, .auth-card label { display: flex; flex-direction: column; gap: 6px;
   font-size: 13px; color: var(--muted); }
 .row-form .grow { flex: 1; min-width: 160px; }
+.inline-form { display: flex; gap: 6px; align-items: center; }
+.inline-form input { width: 90px; }
 input, select {
   background: var(--panel2); color: var(--text); border: 1px solid var(--line);
   border-radius: 9px; padding: 10px 12px; font: inherit; font-size: 14px; outline: none;

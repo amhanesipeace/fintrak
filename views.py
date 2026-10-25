@@ -9,7 +9,7 @@ from sqlalchemy import func
 import charts
 import market
 from extensions import db
-from models import Transaction, Holding, Budget
+from models import Transaction, Holding, Budget, SavingsGoal
 from queries import current_month_spending
 
 main = Blueprint("main", __name__)
@@ -206,6 +206,77 @@ def delete_budget(bid):
     db.session.commit()
     flash("Budget removed.", "success")
     return redirect(url_for("main.budgets"))
+
+
+@main.route("/goals")
+@login_required
+def goals():
+    rows = [g.to_dict() for g in (SavingsGoal.query
+            .filter_by(user_id=current_user.id)
+            .order_by(SavingsGoal.name).all())]
+    return render_template("goals.html", rows=rows)
+
+
+@main.route("/goals/add", methods=["POST"])
+@login_required
+def add_goal():
+    name = (request.form.get("name") or "").strip()
+    try:
+        if not name:
+            raise ValueError("name required")
+        target = float(request.form.get("target_amount", ""))
+        if target <= 0:
+            raise ValueError("bad target")
+        current = float(request.form.get("current_amount") or 0)
+        if current < 0:
+            raise ValueError("bad current")
+        target_date = None
+        raw_date = (request.form.get("target_date") or "").strip()
+        if raw_date:
+            target_date = datetime.strptime(raw_date, "%Y-%m-%d").date()
+        # Web convenience: re-saving an existing goal name updates its target.
+        existing = SavingsGoal.query.filter_by(user_id=current_user.id,
+                                               name=name).first()
+        if existing:
+            existing.target_amount = round(target, 2)
+            existing.target_date = target_date
+        else:
+            db.session.add(SavingsGoal(
+                user_id=current_user.id, name=name,
+                target_amount=round(target, 2),
+                current_amount=round(current, 2), target_date=target_date))
+        db.session.commit()
+        flash("Goal saved.", "success")
+    except Exception:
+        flash("Please enter a name and a valid target amount.", "error")
+    return redirect(url_for("main.goals"))
+
+
+@main.route("/goals/<int:gid>/contribute", methods=["POST"])
+@login_required
+def contribute_goal(gid):
+    g = SavingsGoal.query.filter_by(id=gid, user_id=current_user.id).first_or_404()
+    try:
+        amount = float(request.form.get("amount", ""))
+        if amount == 0:
+            raise ValueError("no amount")
+        g.current_amount = round(max(g.current_amount + amount, 0.0), 2)
+        db.session.commit()
+        flash("Contribution recorded." if amount > 0 else "Goal adjusted.",
+              "success")
+    except Exception:
+        flash("Please enter a valid amount.", "error")
+    return redirect(url_for("main.goals"))
+
+
+@main.route("/goals/<int:gid>/delete", methods=["POST"])
+@login_required
+def delete_goal(gid):
+    g = SavingsGoal.query.filter_by(id=gid, user_id=current_user.id).first_or_404()
+    db.session.delete(g)
+    db.session.commit()
+    flash("Goal removed.", "success")
+    return redirect(url_for("main.goals"))
 
 
 @main.route("/charts/spending.png")

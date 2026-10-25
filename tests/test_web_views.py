@@ -68,6 +68,62 @@ def test_portfolio_add_invalid_web(client):
     assert b"valid quantity" in resp.data
 
 
+def test_goals_page_renders_empty(client):
+    _register(client)
+    resp = client.get("/goals")
+    assert resp.status_code == 200
+    assert b"Savings Goals" in resp.data
+    assert b"No goals yet" in resp.data
+
+
+def test_add_contribute_and_delete_goal_web(client):
+    _register(client)
+    resp = client.post("/goals/add",
+                       data={"name": "Emergency fund", "target_amount": "1000",
+                             "current_amount": "250", "target_date": "2027-01-01"},
+                       follow_redirects=True)
+    assert resp.status_code == 200
+    assert b"Goal saved" in resp.data
+    page = client.get("/goals").data
+    assert b"Emergency fund" in page and b"by 2027-01-01" in page
+
+    gid = client.get("/api/goals").get_json()[0]["id"]
+    resp = client.post(f"/goals/{gid}/contribute",
+                       data={"amount": "750"}, follow_redirects=True)
+    assert b"Contribution recorded" in resp.data
+    assert client.get("/api/goals").get_json()[0]["reached"] is True
+
+    resp = client.post(f"/goals/{gid}/delete", follow_redirects=True)
+    assert b"Goal removed" in resp.data
+    assert client.get("/api/goals").get_json() == []
+
+
+def test_add_goal_invalid_web(client):
+    _register(client)
+    resp = client.post("/goals/add",
+                       data={"name": "", "target_amount": "nope"},
+                       follow_redirects=True)
+    assert b"valid target amount" in resp.data
+
+
+def test_resave_goal_updates_target_web(client):
+    _register(client)
+    client.post("/goals/add", data={"name": "Car", "target_amount": "100"})
+    client.post("/goals/add", data={"name": "Car", "target_amount": "500"},
+                follow_redirects=True)
+    goals = client.get("/api/goals").get_json()
+    assert len(goals) == 1 and goals[0]["target_amount"] == 500.0
+
+
+def test_contribute_goal_invalid_web(client):
+    _register(client)
+    client.post("/goals/add", data={"name": "Jar", "target_amount": "100"})
+    gid = client.get("/api/goals").get_json()[0]["id"]
+    resp = client.post(f"/goals/{gid}/contribute",
+                       data={"amount": "0"}, follow_redirects=True)
+    assert b"valid amount" in resp.data
+
+
 def test_chart_endpoints_return_png_when_empty(client):
     _register(client)
     for path in ("/charts/spending.png", "/charts/trend.png"):

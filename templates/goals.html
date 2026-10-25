@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Goals · FinTrack{% endblock %}
+{% block content %}
+<h1 class="page-title">Savings Goals</h1>
+
+<div class="card">
+  <h2>Set a goal</h2>
+  <form class="row-form" method="post" action="{{ url_for('main.add_goal') }}">
+    <label>Name
+      <input name="name" type="text" maxlength="100" placeholder="Emergency fund" required>
+    </label>
+    <label>Target
+      <input name="target_amount" type="number" step="0.01" min="0.01" placeholder="0.00" required>
+    </label>
+    <label>Saved so far
+      <input name="current_amount" type="number" step="0.01" min="0" placeholder="0.00">
+    </label>
+    <label>Target date
+      <input name="target_date" type="date">
+    </label>
+    <button class="btn" type="submit">Save</button>
+  </form>
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>Your goals</h2></div>
+  {% if rows %}
+  <table class="table">
+    <thead><tr><th>Goal</th><th class="r">Saved</th><th class="r">Target</th>
+      <th>Progress</th><th class="r">Remaining</th><th>Add</th><th></th></tr></thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td>
+          <span class="tag">{{ r.name }}</span>
+          {% if r.reached %}<span class="pos"> ✓ reached</span>{% endif %}
+          {% if r.target_date %}<div class="muted">by {{ r.target_date }}</div>{% endif %}
+        </td>
+        <td class="r">{{ r.current_amount|money }}</td>
+        <td class="r">{{ r.target_amount|money }}</td>
+        <td>
+          <div class="progress {{ 'over' if r.reached }}">
+            <span style="width: {{ r.progress_percent }}%"></span>
+          </div>
+        </td>
+        <td class="r {{ 'pos' if r.reached else '' }}">{{ r.remaining|money }}</td>
+        <td>
+          <form class="inline-form" method="post"
+                action="{{ url_for('main.contribute_goal', gid=r.id) }}">
+            <input name="amount" type="number" step="0.01" placeholder="0.00"
+                   required aria-label="Contribution amount">
+            <button class="btn" type="submit">+</button>
+          </form>
+        </td>
+        <td class="r">
+          <form method="post" action="{{ url_for('main.delete_goal', gid=r.id) }}"
+                onsubmit="return confirm('Remove this goal?');">
+            <button class="btn-del" title="Remove">✕</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty">No goals yet. Set one above to start saving toward a target.</p>
+  {% endif %}
+</div>
+{% endblock %}
