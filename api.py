@@ -25,7 +25,8 @@ from sqlalchemy import func
 
 import market
 from extensions import db, limiter
-from models import Transaction, Holding, User, Budget, RecurringTransaction
+from models import (Transaction, Holding, User, Budget, RecurringTransaction,
+                    SavingsGoal)
 from queries import current_month_spending
 from recurring import process_due_recurring
 from security import auth_required
@@ -434,3 +435,109 @@ def run_recurring():
     """Materialise this user's due rules now (also runs daily via Celery beat)."""
     created = process_due_recurring(user_id=g.user_id)
     return jsonify({"created": created})
+
+
+# --- Savings goals ----------------------------------------------------------
+#
+# A goal is a named savings target (e.g. "Emergency fund") with progress tracked
+# by contributions. Complements budgets: budgets cap category spending, goals
+# track saving toward a target.
+
+def _parse_goal_date(data, current=None):
+    """Return the parsed target_date, or raise ValueError on a bad string.
+
+    Missing key -> keep ``current``; explicit null -> clear it.
+    """
+    if "target_date" not in data:
+        return current
+    raw = data["target_date"]
+    if not raw:
+        return None
+    return datetime.strptime(raw, "%Y-%m-%d").date()
+
+
+@api.route("/goals")
+@auth_required
+def list_goals():
+    goals = (SavingsGoal.query.filter_by(user_id=g.user_id)
+             .order_by(SavingsGoal.name).all())
+    return jsonify([goal.to_dict() for goal in goals])
+
+
+@api.route("/goals", methods=["POST"])
+@auth_required
+def create_goal():
+    data = request.get_json(silent=True) or {}
+    name = (data.get("name") or "").strip()
+    try:
+        target = float(data["target_amount"])
+        current = float(data.get("current_amount", 0) or 0)
+        if not name or target <= 0 or current < 0:
+            raise ValueError
+        target_date = _parse_goal_date(data)
+    except (KeyError, ValueError, TypeError):
+        return jsonify({"error": "invalid payload"}), 400
+    if SavingsGoal.query.filter_by(user_id=g.user_id, name=name).first():
+        return jsonify({"error": "goal with this name already exists"}), 409
+    goal = SavingsGoal(user_id=g.user_id, name=name,
+                       target_amount=round(target, 2),
+                       current_amount=round(current, 2), target_date=target_date)
+    db.session.add(goal)
+    db.session.commit()
+    return jsonify(goal.to_dict()), 201
+
+
+@api.route("/goals/<int:gid>", methods=["PUT", "PATCH"])
+@auth_required
+def update_goal(gid):
+    goal = SavingsGoal.query.filter_by(id=gid, user_id=g.user_id).first()
+    if not goal:
+        return jsonify({"error": "not found"}), 404
+    data = request.get_json(silent=True) or {}
+    try:
+        target = float(data.get("target_amount", goal.target_amount))
+        current = float(data.get("current_amount", goal.current_amount))
+        if target <= 0 or current < 0:
+            raise ValueError
+        goal.target_date = _parse_goal_date(data, goal.target_date)
+    except (ValueError, TypeError):
+        return jsonify({"error": "invalid payload"}), 400
+    goal.target_amount = round(target, 2)
+    goal.current_amount = round(current, 2)
+    if data.get("name"):
+        goal.name = data["name"].strip()
+    db.session.commit()
+    return jsonify(goal.to_dict())
+
+
+@api.route("/goals/<int:gid>/contribute", methods=["POST"])
+@auth_required
+def contribute_goal(gid):
+    """Add to (or, with a negative amount, correct) a goal's saved total.
+
+    The balance never drops below zero, so an over-large withdrawal clamps to 0.
+    """
+    goal = SavingsGoal.query.filter_by(id=gid, user_id=g.user_id).first()
+    if not goal:
+        return jsonify({"error": "not found"}), 404
+    data = request.get_json(silent=True) or {}
+    try:
+        amount = float(data["amount"])
+        if amount == 0:
+            raise ValueError
+    except (KeyError, ValueError, TypeError):
+        return jsonify({"error": "invalid payload"}), 400
+    goal.current_amount = round(max(goal.current_amount + amount, 0.0), 2)
+    db.session.commit()
+    return jsonify(goal.to_dict())
+
+
+@api.route("/goals/<int:gid>", methods=["DELETE"])
+@auth_required
+def delete_goal(gid):
+    goal = SavingsGoal.query.filter_by(id=gid, user_id=g.user_id).first()
+    if not goal:
+        return jsonify({"error": "not found"}), 404
+    db.session.delete(goal)
+    db.session.commit()
+    return jsonify({"deleted": gid})

@@ -48,6 +48,20 @@ _RECURRING = {
     },
 }
 
+_GOAL = {
+    "type": "object",
+    "properties": {
+        "id": {"type": "integer"},
+        "name": {"type": "string"},
+        "target_amount": {"type": "number", "format": "float"},
+        "current_amount": {"type": "number", "format": "float"},
+        "remaining": {"type": "number", "format": "float"},
+        "progress_percent": {"type": "number", "format": "float"},
+        "reached": {"type": "boolean"},
+        "target_date": {"type": "string", "format": "date"},
+    },
+}
+
 _TOKENS = {
     "type": "object",
     "properties": {
@@ -98,6 +112,7 @@ def build_template():
             {"name": "Transactions", "description": "Income and expense records"},
             {"name": "Budgets", "description": "Per-category monthly spending limits"},
             {"name": "Recurring", "description": "Rules that auto-create transactions"},
+            {"name": "Goals", "description": "Savings targets and their progress"},
             {"name": "Portfolio", "description": "Stock holdings and live quotes"},
         ],
         "definitions": {
@@ -105,6 +120,7 @@ def build_template():
             "Transaction": _TRANSACTION,
             "Budget": _BUDGET,
             "RecurringTransaction": _RECURRING,
+            "SavingsGoal": _GOAL,
             "Tokens": _TOKENS,
         },
         "paths": _paths(),
@@ -391,6 +407,74 @@ def _paths():
                     "401": unauthorized,
                 },
             }
+        },
+        "/goals": {
+            "get": {
+                "tags": ["Goals"], "summary": "List savings goals with progress",
+                "security": _SECURED,
+                "responses": {
+                    "200": {"description": "OK", "schema": {
+                        "type": "array", "items": {"$ref": "#/definitions/SavingsGoal"}}},
+                    "401": unauthorized,
+                },
+            },
+            "post": {
+                "tags": ["Goals"], "summary": "Create a savings goal",
+                "security": _SECURED,
+                "parameters": [_body("goal", {
+                    "type": "object", "required": ["name", "target_amount"],
+                    "properties": {
+                        "name": {"type": "string"},
+                        "target_amount": {"type": "number"},
+                        "current_amount": {"type": "number",
+                                           "description": "Amount already saved; defaults to 0"},
+                        "target_date": {"type": "string", "format": "date",
+                                        "description": "Optional deadline"},
+                    },
+                })],
+                "responses": {
+                    "201": {"description": "Created", "schema": {"$ref": "#/definitions/SavingsGoal"}},
+                    "400": bad_request, "401": unauthorized,
+                    "409": {"description": "Goal with this name already exists",
+                            "schema": {"$ref": "#/definitions/Error"}},
+                },
+            },
+        },
+        "/goals/{gid}": {
+            "parameters": [{"in": "path", "name": "gid", "type": "integer", "required": True}],
+            "put": {
+                "tags": ["Goals"], "summary": "Update a savings goal",
+                "security": _SECURED,
+                "parameters": [_body("goal", {"$ref": "#/definitions/SavingsGoal"}, required=False)],
+                "responses": {
+                    "200": {"description": "OK", "schema": {"$ref": "#/definitions/SavingsGoal"}},
+                    "400": bad_request, "401": unauthorized, "404": not_found,
+                },
+            },
+            "delete": {
+                "tags": ["Goals"], "summary": "Delete a savings goal",
+                "security": _SECURED,
+                "responses": {"200": {"description": "Deleted"},
+                              "401": unauthorized, "404": not_found},
+            },
+        },
+        "/goals/{gid}/contribute": {
+            "parameters": [{"in": "path", "name": "gid", "type": "integer", "required": True}],
+            "post": {
+                "tags": ["Goals"],
+                "summary": "Add to (or correct) a goal's saved amount",
+                "description": "A negative amount withdraws; the balance never drops "
+                               "below zero.",
+                "security": _SECURED,
+                "parameters": [_body("contribution", {
+                    "type": "object", "required": ["amount"],
+                    "properties": {"amount": {"type": "number"}},
+                })],
+                "responses": {
+                    "200": {"description": "OK", "schema": {"$ref": "#/definitions/SavingsGoal"}},
+                    "400": bad_request, "401": unauthorized, "404": not_found,
+                },
+            },
         },
         "/portfolio": {
             "get": {

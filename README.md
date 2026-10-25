@@ -134,6 +134,9 @@ curl -X POST http://localhost:8000/api/transactions \
 | `GET/POST /api/recurring` | List / create recurring rules (daily/weekly/monthly) |
 | `PUT/DELETE /api/recurring/<id>` | Update / delete a recurring rule |
 | `POST /api/recurring/run` | Materialise due rules now (also runs daily via Celery) |
+| `GET/POST /api/goals` | List savings goals (with progress) / create a goal |
+| `PUT/DELETE /api/goals/<id>` | Update / delete a savings goal |
+| `POST /api/goals/<id>/contribute` | Add to (or, with a negative amount, correct) a goal's saved total |
 | `GET  /api/quotes?symbols=AAPL,MSFT` | Live stock quotes (cached) |
 | `GET  /api/portfolio` | Valued holdings + total |
 

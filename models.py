@@ -33,6 +33,9 @@ class User(UserMixin, db.Model):
     budgets = db.relationship(
         "Budget", backref="user", lazy=True, cascade="all, delete-orphan"
     )
+    goals = db.relationship(
+        "SavingsGoal", backref="user", lazy=True, cascade="all, delete-orphan"
+    )
 
     def set_password(self, password):
         # bcrypt returns bytes; store as utf-8 string.
@@ -156,4 +159,41 @@ class RecurringTransaction(db.Model):
             "frequency": self.frequency,
             "next_date": self.next_date.isoformat() if self.next_date else None,
             "active": self.active,
+        }
+
+
+class SavingsGoal(db.Model):
+    """A user's savings target (e.g. "Emergency fund"), with progress tracked
+    by contributions. Complements :class:`Budget`: a budget caps spending in a
+    category, a goal tracks saving toward a named target.
+    """
+    __tablename__ = "savings_goals"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(
+        db.Integer, db.ForeignKey("users.id"), nullable=False, index=True
+    )
+    name = db.Column(db.String(100), nullable=False)
+    target_amount = db.Column(db.Float, nullable=False)      # amount to reach
+    current_amount = db.Column(db.Float, nullable=False, default=0)  # saved so far
+    target_date = db.Column(db.Date)                         # optional deadline
+    created_at = db.Column(db.DateTime, default=utcnow)
+
+    # One goal per (user, name).
+    __table_args__ = (
+        db.UniqueConstraint("user_id", "name", name="uq_goal_user_name"),
+    )
+
+    def to_dict(self):
+        target, saved = self.target_amount, self.current_amount
+        return {
+            "id": self.id,
+            "name": self.name,
+            "target_amount": round(target, 2),
+            "current_amount": round(saved, 2),
+            "remaining": round(max(target - saved, 0.0), 2),
+            "progress_percent": (round(min(100 * saved / target, 100), 1)
+                                 if target else 0.0),
+            "reached": saved >= target,
+            "target_date": self.target_date.isoformat() if self.target_date else None,
         }
