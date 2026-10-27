@@ -18,6 +18,38 @@
   </div>
 </div>
 
+{% if alerts %}
+<div class="card">
+  <div class="card-head">
+    <h2>Budget alerts</h2>
+    <a class="btn-sm" href="{{ url_for('main.budgets') }}">Manage budgets</a>
+  </div>
+  <table class="table">
+    <thead><tr><th>Category</th><th class="r">Spent</th><th class="r">Limit</th>
+      <th>Progress</th><th></th></tr></thead>
+    <tbody>
+      {% for a in alerts %}
+      <tr>
+        <td><span class="tag">{{ a.category }}</span></td>
+        <td class="r">{{ a.spent|money }}</td>
+        <td class="r">{{ a.limit|money }}</td>
+        <td>
+          <div class="progress {{ a.status }}">
+            <span style="width: {{ a.percent }}%"></span>
+          </div>
+        </td>
+        <td class="r">
+          <span class="pill {{ a.status }}">
+            {{ 'Over budget' if a.status == 'over' else 'Nearing limit' }}
+          </span>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
 <div class="grid-2">
   <div class="card">
     <img class="chart" src="{{ url_for('main.chart_trend') }}" alt="Income vs expenses">

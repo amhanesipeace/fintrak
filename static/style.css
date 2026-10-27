@@ -7,6 +7,7 @@
   --muted: #8b90b0;
   --green: #00e0a4;
   --red: #ff5b7f;
+  --amber: #e8a33d;
   --accent: #5b8cff;
 }
 * { box-sizing: border-box; }
@@ -139,3 +140,6 @@ input:focus, select:focus { border-color: var(--accent); }
 .progress > span { display: block; height: 100%; background: var(--green);
   border-radius: 20px; transition: width .3s; }
 .progress.over > span { background: var(--red); }
+.progress.warning > span { background: var(--amber); }
+.pill.warning { background: rgba(232,163,61,0.16); color: var(--amber); }
+.pill.over { background: rgba(255,91,127,0.16); color: var(--red); }

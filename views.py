@@ -10,7 +10,7 @@ import charts
 import market
 from extensions import db
 from models import Transaction, Holding, Budget, SavingsGoal
-from queries import current_month_spending
+from queries import budget_alerts, current_month_spending
 
 main = Blueprint("main", __name__)
 
@@ -38,7 +38,8 @@ def dashboard():
               .order_by(Transaction.date.desc(), Transaction.id.desc())
               .limit(8).all())
     return render_template("dashboard.html", income=income, expense=expense,
-                           balance=income - expense, recent=recent)
+                           balance=income - expense, recent=recent,
+                           alerts=budget_alerts(uid))
 
 
 @main.route("/transactions")

@@ -4,7 +4,10 @@ from datetime import date
 from sqlalchemy import func
 
 from extensions import db
-from models import Transaction
+from models import Budget, Transaction
+
+# A category this close to its limit (as a fraction) is flagged as a warning.
+WARNING_THRESHOLD = 0.8
 
 
 def month_bounds(today=None):
@@ -29,3 +32,32 @@ def current_month_spending(user_id):
             .group_by(Transaction.category)
             .all())
     return {category: float(total) for category, total in rows}
+
+
+def budget_alerts(user_id):
+    """Categories at or near their monthly budget, worst first.
+
+    Returns a list of dicts for every budgeted category whose spending this
+    month has reached the warning threshold (80%). Each entry carries the limit,
+    the amount spent, the percentage used (capped at 100 for the bar), how much
+    is left, and a status of ``"over"`` (>= 100%) or ``"warning"`` (80-99%).
+    Categories comfortably under budget are omitted so the dashboard only shows
+    what needs attention.
+    """
+    spending = current_month_spending(user_id)
+    alerts = []
+    for b in Budget.query.filter_by(user_id=user_id).all():
+        spent = spending.get(b.category, 0.0)
+        if not b.amount or spent < b.amount * WARNING_THRESHOLD:
+            continue
+        ratio = spent / b.amount
+        alerts.append({
+            "category": b.category,
+            "limit": b.amount,
+            "spent": round(spent, 2),
+            "remaining": round(b.amount - spent, 2),
+            "percent": min(100, round(100 * ratio)),
+            "status": "over" if spent >= b.amount else "warning",
+        })
+    alerts.sort(key=lambda a: a["spent"] / a["limit"], reverse=True)
+    return alerts
