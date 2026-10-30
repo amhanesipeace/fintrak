@@ -9,8 +9,9 @@ from sqlalchemy import func
 import charts
 import market
 from extensions import db
-from models import Transaction, Holding, Budget, SavingsGoal
+from models import Transaction, Holding, Budget, SavingsGoal, RecurringTransaction
 from queries import budget_alerts, current_month_spending
+from recurring import process_due_recurring
 
 main = Blueprint("main", __name__)
 
@@ -278,6 +279,76 @@ def delete_goal(gid):
     db.session.commit()
     flash("Goal removed.", "success")
     return redirect(url_for("main.goals"))
+
+
+@main.route("/recurring")
+@login_required
+def recurring():
+    rows = [r.to_dict() for r in (RecurringTransaction.query
+            .filter_by(user_id=current_user.id)
+            .order_by(RecurringTransaction.next_date).all())]
+    return render_template("recurring.html", rows=rows, categories=CATEGORIES,
+                           frequencies=RecurringTransaction.FREQUENCIES,
+                           today=date.today().isoformat())
+
+
+@main.route("/recurring/add", methods=["POST"])
+@login_required
+def add_recurring():
+    try:
+        t_type = request.form.get("type")
+        amount = float(request.form.get("amount", ""))
+        category = request.form.get("category") or "Other"
+        note = request.form.get("note", "").strip() or None
+        frequency = request.form.get("frequency")
+        d_raw = request.form.get("start_date") or date.today().isoformat()
+        next_date = datetime.strptime(d_raw, "%Y-%m-%d").date()
+        if (t_type not in ("income", "expense") or amount <= 0
+                or frequency not in RecurringTransaction.FREQUENCIES):
+            raise ValueError("bad input")
+        db.session.add(RecurringTransaction(
+            user_id=current_user.id, type=t_type, amount=round(amount, 2),
+            category=category, note=note, frequency=frequency,
+            next_date=next_date))
+        db.session.commit()
+        flash("Recurring rule added.", "success")
+    except Exception:
+        flash("Please enter a valid amount, type and frequency.", "error")
+    return redirect(url_for("main.recurring"))
+
+
+@main.route("/recurring/<int:rid>/toggle", methods=["POST"])
+@login_required
+def toggle_recurring(rid):
+    rule = RecurringTransaction.query.filter_by(
+        id=rid, user_id=current_user.id).first_or_404()
+    rule.active = not rule.active
+    db.session.commit()
+    flash("Rule resumed." if rule.active else "Rule paused.", "success")
+    return redirect(url_for("main.recurring"))
+
+
+@main.route("/recurring/<int:rid>/delete", methods=["POST"])
+@login_required
+def delete_recurring(rid):
+    rule = RecurringTransaction.query.filter_by(
+        id=rid, user_id=current_user.id).first_or_404()
+    db.session.delete(rule)
+    db.session.commit()
+    flash("Recurring rule removed.", "success")
+    return redirect(url_for("main.recurring"))
+
+
+@main.route("/recurring/run", methods=["POST"])
+@login_required
+def run_recurring_web():
+    created = process_due_recurring(user_id=current_user.id)
+    if created:
+        flash(f"Posted {created} due transaction{'s' if created != 1 else ''}.",
+              "success")
+    else:
+        flash("Nothing due right now.", "success")
+    return redirect(url_for("main.recurring"))
 
 
 @main.route("/charts/spending.png")

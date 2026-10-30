@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Recurring · FinTrack{% endblock %}
+{% block content %}
+<div class="card-head">
+  <h1 class="page-title">Recurring Transactions</h1>
+  <form method="post" action="{{ url_for('main.run_recurring_web') }}">
+    <button class="btn-sm" type="submit">Post due now</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Add a rule</h2>
+  <form class="row-form" method="post" action="{{ url_for('main.add_recurring') }}">
+    <label>Type
+      <select name="type" required>
+        <option value="expense">Expense</option>
+        <option value="income">Income</option>
+      </select>
+    </label>
+    <label>Amount
+      <input name="amount" type="number" step="0.01" min="0.01" placeholder="0.00" required>
+    </label>
+    <label>Category
+      <select name="category">
+        {% for c in categories %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Frequency
+      <select name="frequency" required>
+        {% for f in frequencies %}<option value="{{ f }}">{{ f|capitalize }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Starts
+      <input name="start_date" type="date" value="{{ today }}">
+    </label>
+    <label class="grow">Note
+      <input name="note" type="text" maxlength="255" placeholder="optional">
+    </label>
+    <button class="btn" type="submit">Add</button>
+  </form>
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>Your rules</h2></div>
+  {% if rows %}
+  <table class="table">
+    <thead><tr><th>Category</th><th class="r">Amount</th><th>Every</th>
+      <th>Next</th><th>Status</th><th>Pause</th><th></th></tr></thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td>
+          <span class="tag">{{ r.category }}</span>
+          {% if r.note %}<div class="muted">{{ r.note }}</div>{% endif %}
+        </td>
+        <td class="r {{ 'pos' if r.type == 'income' else 'neg' }}">
+          {{ '+' if r.type == 'income' else '−' }}{{ r.amount|money }}
+        </td>
+        <td>{{ r.frequency|capitalize }}</td>
+        <td>{{ r.next_date }}</td>
+        <td>
+          <span class="pill {{ 'income' if r.active else 'expense' }}">
+            {{ 'Active' if r.active else 'Paused' }}
+          </span>
+        </td>
+        <td>
+          <form method="post" action="{{ url_for('main.toggle_recurring', rid=r.id) }}">
+            <button class="btn-sm" type="submit">{{ 'Pause' if r.active else 'Resume' }}</button>
+          </form>
+        </td>
+        <td class="r">
+          <form method="post" action="{{ url_for('main.delete_recurring', rid=r.id) }}"
+                onsubmit="return confirm('Remove this rule?');">
+            <button class="btn-del" title="Remove">✕</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty">No recurring rules yet. Add one above to automate repeating income or bills.</p>
+  {% endif %}
+</div>
+{% endblock %}

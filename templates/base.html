@@ -16,6 +16,7 @@
       <a href="{{ url_for('main.portfolio') }}" class="{{ 'active' if request.endpoint=='main.portfolio' }}">Portfolio</a>
       <a href="{{ url_for('main.budgets') }}" class="{{ 'active' if request.endpoint=='main.budgets' }}">Budgets</a>
       <a href="{{ url_for('main.goals') }}" class="{{ 'active' if request.endpoint=='main.goals' }}">Goals</a>
+      <a href="{{ url_for('main.recurring') }}" class="{{ 'active' if request.endpoint=='main.recurring' }}">Recurring</a>
     </div>
     <div class="user">
       <span>{{ current_user.username }}</span>

@@ -144,3 +144,67 @@ def test_chart_endpoints_return_png_with_data(client):
         resp = client.get(path)
         assert resp.status_code == 200
         assert resp.content_type == "image/png"
+
+
+def test_recurring_page_renders_empty(client):
+    _register(client)
+    resp = client.get("/recurring")
+    assert resp.status_code == 200
+    assert b"Recurring Transactions" in resp.data
+    assert b"No recurring rules yet" in resp.data
+
+
+def test_add_toggle_and_delete_recurring_web(client):
+    _register(client)
+    resp = client.post("/recurring/add",
+                       data={"type": "expense", "amount": "15.99",
+                             "category": "Utilities", "frequency": "monthly",
+                             "note": "Netflix", "start_date": "2026-11-01"},
+                       follow_redirects=True)
+    assert resp.status_code == 200
+    assert b"Recurring rule added" in resp.data
+    page = client.get("/recurring").data
+    assert b"Utilities" in page and b"Netflix" in page and b"Monthly" in page
+
+    rid = client.get("/api/recurring").get_json()[0]["id"]
+    # Pause, then confirm the rule reads as inactive via the API.
+    resp = client.post(f"/recurring/{rid}/toggle", follow_redirects=True)
+    assert b"Rule paused" in resp.data
+    assert client.get("/api/recurring").get_json()[0]["active"] is False
+    # Resume flips it back.
+    resp = client.post(f"/recurring/{rid}/toggle", follow_redirects=True)
+    assert b"Rule resumed" in resp.data
+    assert client.get("/api/recurring").get_json()[0]["active"] is True
+
+    resp = client.post(f"/recurring/{rid}/delete", follow_redirects=True)
+    assert b"Recurring rule removed" in resp.data
+    assert client.get("/api/recurring").get_json() == []
+
+
+def test_add_recurring_invalid_web(client):
+    _register(client)
+    resp = client.post("/recurring/add",
+                       data={"type": "expense", "amount": "5",
+                             "frequency": "yearly"},   # unsupported cadence
+                       follow_redirects=True)
+    assert b"valid amount, type and frequency" in resp.data
+    assert client.get("/api/recurring").get_json() == []
+
+
+def test_run_recurring_web_posts_due(client):
+    _register(client)
+    # A monthly rule whose next_date is already in the past -> at least one due.
+    client.post("/recurring/add",
+                data={"type": "expense", "amount": "20", "category": "Rent",
+                      "frequency": "monthly", "start_date": "2026-01-01"})
+    resp = client.post("/recurring/run", follow_redirects=True)
+    assert b"Posted" in resp.data and b"due transaction" in resp.data
+    # The materialised rows now show up as real transactions.
+    assert any(t["category"] == "Rent"
+               for t in client.get("/api/transactions").get_json()["items"])
+
+
+def test_run_recurring_web_nothing_due(client):
+    _register(client)
+    resp = client.post("/recurring/run", follow_redirects=True)
+    assert b"Nothing due right now" in resp.data
