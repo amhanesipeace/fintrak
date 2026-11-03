@@ -317,6 +317,38 @@ def add_recurring():
     return redirect(url_for("main.recurring"))
 
 
+@main.route("/recurring/<int:rid>/edit", methods=["GET", "POST"])
+@login_required
+def edit_recurring(rid):
+    rule = RecurringTransaction.query.filter_by(
+        id=rid, user_id=current_user.id).first_or_404()
+    if request.method == "POST":
+        try:
+            t_type = request.form.get("type")
+            amount = float(request.form.get("amount", ""))
+            category = request.form.get("category") or "Other"
+            note = request.form.get("note", "").strip() or None
+            frequency = request.form.get("frequency")
+            d_raw = request.form.get("next_date") or rule.next_date.isoformat()
+            next_date = datetime.strptime(d_raw, "%Y-%m-%d").date()
+            if (t_type not in ("income", "expense") or amount <= 0
+                    or frequency not in RecurringTransaction.FREQUENCIES):
+                raise ValueError("bad input")
+            rule.type = t_type
+            rule.amount = round(amount, 2)
+            rule.category = category
+            rule.note = note
+            rule.frequency = frequency
+            rule.next_date = next_date
+            db.session.commit()
+            flash("Recurring rule updated.", "success")
+            return redirect(url_for("main.recurring"))
+        except Exception:
+            flash("Please enter a valid amount, type and frequency.", "error")
+    return render_template("edit_recurring.html", rule=rule, categories=CATEGORIES,
+                           frequencies=RecurringTransaction.FREQUENCIES)
+
+
 @main.route("/recurring/<int:rid>/toggle", methods=["POST"])
 @login_required
 def toggle_recurring(rid):

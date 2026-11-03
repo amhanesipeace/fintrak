@@ -45,7 +45,7 @@
   {% if rows %}
   <table class="table">
     <thead><tr><th>Category</th><th class="r">Amount</th><th>Every</th>
-      <th>Next</th><th>Status</th><th>Pause</th><th></th></tr></thead>
+      <th>Next</th><th>Status</th><th>Edit</th><th>Pause</th><th></th></tr></thead>
     <tbody>
       {% for r in rows %}
       <tr>
@@ -62,6 +62,9 @@
           <span class="pill {{ 'income' if r.active else 'expense' }}">
             {{ 'Active' if r.active else 'Paused' }}
           </span>
+        </td>
+        <td>
+          <a class="btn-sm" href="{{ url_for('main.edit_recurring', rid=r.id) }}">Edit</a>
         </td>
         <td>
           <form method="post" action="{{ url_for('main.toggle_recurring', rid=r.id) }}">

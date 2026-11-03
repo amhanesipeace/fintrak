@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Edit recurring rule · FinTrack{% endblock %}
+{% block content %}
+<h1 class="page-title">Edit recurring rule</h1>
+
+<div class="card">
+  <form class="row-form" method="post"
+        action="{{ url_for('main.edit_recurring', rid=rule.id) }}">
+    <label>Type
+      <select name="type" required>
+        <option value="expense" {{ 'selected' if rule.type=='expense' }}>Expense</option>
+        <option value="income"  {{ 'selected' if rule.type=='income'  }}>Income</option>
+      </select>
+    </label>
+    <label>Amount
+      <input name="amount" type="number" step="0.01" min="0.01"
+             value="{{ '%.2f'|format(rule.amount) }}" required>
+    </label>
+    <label>Category
+      <select name="category">
+        {% for c in categories %}
+        <option value="{{ c }}" {{ 'selected' if c==rule.category }}>{{ c }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Frequency
+      <select name="frequency" required>
+        {% for f in frequencies %}
+        <option value="{{ f }}" {{ 'selected' if f==rule.frequency }}>{{ f|capitalize }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Next date
+      <input name="next_date" type="date" value="{{ rule.next_date.isoformat() }}">
+    </label>
+    <label class="grow">Note
+      <input name="note" type="text" maxlength="255"
+             value="{{ rule.note or '' }}" placeholder="optional">
+    </label>
+    <button class="btn" type="submit">Save</button>
+    <a class="btn-ghost" href="{{ url_for('main.recurring') }}">Cancel</a>
+  </form>
+</div>
+{% endblock %}

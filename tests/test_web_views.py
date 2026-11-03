@@ -208,3 +208,53 @@ def test_run_recurring_web_nothing_due(client):
     _register(client)
     resp = client.post("/recurring/run", follow_redirects=True)
     assert b"Nothing due right now" in resp.data
+
+
+def test_edit_recurring_web(client):
+    _register(client)
+    client.post("/recurring/add",
+                data={"type": "expense", "amount": "15.99",
+                      "category": "Utilities", "frequency": "monthly",
+                      "note": "Netflix", "start_date": "2026-11-01"})
+    rid = client.get("/api/recurring").get_json()[0]["id"]
+
+    # The edit form pre-fills the current values.
+    form = client.get(f"/recurring/{rid}/edit").data
+    assert b"Edit recurring rule" in form and b"Netflix" in form
+
+    resp = client.post(f"/recurring/{rid}/edit",
+                       data={"type": "expense", "amount": "17.50",
+                             "category": "Entertainment", "frequency": "weekly",
+                             "note": "Netflix+", "next_date": "2026-12-01"},
+                       follow_redirects=True)
+    assert b"Recurring rule updated" in resp.data
+    rule = client.get("/api/recurring").get_json()[0]
+    assert rule["amount"] == 17.5 and rule["category"] == "Entertainment"
+    assert rule["frequency"] == "weekly" and rule["next_date"] == "2026-12-01"
+    assert rule["note"] == "Netflix+"
+
+
+def test_edit_recurring_invalid_web(client):
+    _register(client)
+    client.post("/recurring/add",
+                data={"type": "expense", "amount": "10", "category": "Food",
+                      "frequency": "monthly", "start_date": "2026-11-01"})
+    rid = client.get("/api/recurring").get_json()[0]["id"]
+    resp = client.post(f"/recurring/{rid}/edit",
+                       data={"type": "expense", "amount": "10",
+                             "frequency": "yearly"},   # unsupported cadence
+                       follow_redirects=True)
+    assert b"valid amount, type and frequency" in resp.data
+    # Unchanged: still monthly at the original amount.
+    assert client.get("/api/recurring").get_json()[0]["frequency"] == "monthly"
+
+
+def test_edit_recurring_other_user_404(client):
+    _register(client, "owner")
+    client.post("/recurring/add",
+                data={"type": "expense", "amount": "10", "category": "Food",
+                      "frequency": "monthly", "start_date": "2026-11-01"})
+    rid = client.get("/api/recurring").get_json()[0]["id"]
+    client.get("/logout", follow_redirects=True)
+    _register(client, "intruder")
+    assert client.get(f"/recurring/{rid}/edit").status_code == 404
