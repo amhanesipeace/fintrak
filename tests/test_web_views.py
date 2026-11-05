@@ -126,7 +126,7 @@ def test_contribute_goal_invalid_web(client):
 
 def test_chart_endpoints_return_png_when_empty(client):
     _register(client)
-    for path in ("/charts/spending.png", "/charts/trend.png"):
+    for path in ("/charts/spending.png", "/charts/trend.png", "/charts/networth.png"):
         resp = client.get(path)
         assert resp.status_code == 200
         assert resp.content_type == "image/png"
@@ -140,7 +140,7 @@ def test_chart_endpoints_return_png_with_data(client):
                 data={"type": "expense", "amount": "50", "category": "Food"})
     client.post("/transactions/add",
                 data={"type": "income", "amount": "1000", "category": "Salary"})
-    for path in ("/charts/spending.png", "/charts/trend.png"):
+    for path in ("/charts/spending.png", "/charts/trend.png", "/charts/networth.png"):
         resp = client.get(path)
         assert resp.status_code == 200
         assert resp.content_type == "image/png"

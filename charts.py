@@ -81,6 +81,68 @@ def _last_months(n=6):
     return list(reversed(out))
 
 
+def _signed_sum(txns):
+    """Net of a transaction list: income positive, expense negative."""
+    return sum(t.amount if t.type == "income" else -t.amount for t in txns)
+
+
+def net_worth_trend_png(user_id):
+    """Running balance (cumulative income − expenses) at each month-end.
+
+    Unlike the income-vs-expenses bars, this shows the *trajectory* of net worth:
+    the line carries an opening balance from everything before the 6-month window
+    so the curve starts where the account actually stood.
+    """
+    fig = Figure(figsize=(5.6, 3.8), dpi=110)
+    fig.patch.set_facecolor(PANEL)
+
+    months = _last_months(6)
+    start = date(months[0][0], months[0][1], 1)
+
+    # Opening balance: everything strictly before the window.
+    opening = _signed_sum(
+        Transaction.query
+        .filter(Transaction.user_id == user_id, Transaction.date < start).all())
+
+    window = (Transaction.query
+              .filter(Transaction.user_id == user_id, Transaction.date >= start)
+              .all())
+    if not window and opening == 0:
+        return _empty(fig, "No data for the last 6 months")
+
+    net = {ym: 0.0 for ym in months}
+    for t in window:
+        ym = (t.date.year, t.date.month)
+        if ym in net:
+            net[ym] += t.amount if t.type == "income" else -t.amount
+
+    labels, balances, running = [], [], opening
+    for (y, m) in months:
+        running += net[(y, m)]
+        balances.append(running)
+        labels.append(date(y, m, 1).strftime("%b"))
+
+    ax = fig.add_subplot(111)
+    ax.set_facecolor(PANEL)
+    x = range(len(months))
+    ax.plot(x, balances, color=GREEN, linewidth=2, marker="o", markersize=5,
+            zorder=3)
+    ax.fill_between(x, balances, min(0.0, min(balances)), color=GREEN, alpha=0.12)
+    ax.axhline(0, color=MUTED, linewidth=0.8, alpha=0.5)
+
+    ax.set_xticks(list(x))
+    ax.set_xticklabels(labels, color=MUTED, fontsize=9)
+    ax.tick_params(axis="y", colors=MUTED, labelsize=8)
+    for spine in ("top", "right"):
+        ax.spines[spine].set_visible(False)
+    for spine in ("left", "bottom"):
+        ax.spines[spine].set_color(GRID)
+    ax.yaxis.grid(True, color=GRID, linewidth=0.6, alpha=0.6)
+    ax.set_axisbelow(True)
+    ax.set_title("Net worth (last 6 months)", color=TEXT, fontsize=12, pad=10)
+    return _png(fig)
+
+
 def income_expense_trend_png(user_id):
     fig = Figure(figsize=(5.6, 3.8), dpi=110)
     fig.patch.set_facecolor(PANEL)

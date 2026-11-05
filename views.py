@@ -395,3 +395,10 @@ def chart_spending():
 def chart_trend():
     return Response(charts.income_expense_trend_png(current_user.id),
                     mimetype="image/png")
+
+
+@main.route("/charts/networth.png")
+@login_required
+def chart_networth():
+    return Response(charts.net_worth_trend_png(current_user.id),
+                    mimetype="image/png")
