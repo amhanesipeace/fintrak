@@ -31,10 +31,43 @@
 </div>
 
 <div class="card">
+  <h2>Filter</h2>
+  <form class="row-form" method="get" action="{{ url_for('main.transactions') }}">
+    <label>Type
+      <select name="type">
+        <option value="">Any</option>
+        <option value="income"  {{ 'selected' if filters.type=='income' }}>Income</option>
+        <option value="expense" {{ 'selected' if filters.type=='expense' }}>Expense</option>
+      </select>
+    </label>
+    <label>Category
+      <select name="category">
+        <option value="">Any</option>
+        {% for c in categories %}
+        <option value="{{ c }}" {{ 'selected' if c==filters.category }}>{{ c }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>From
+      <input name="from" type="date" value="{{ filters.from }}">
+    </label>
+    <label>To
+      <input name="to" type="date" value="{{ filters.to }}">
+    </label>
+    <button class="btn" type="submit">Apply</button>
+    {% if active_filters %}
+    <a class="btn-ghost" href="{{ url_for('main.transactions') }}">Clear</a>
+    {% endif %}
+  </form>
+  {% if date_error %}<p class="flash error" style="margin-top:12px">
+    Please use valid YYYY-MM-DD dates.</p>{% endif %}
+</div>
+
+<div class="card">
   <div class="card-head">
-    <h2>History</h2>
-    {% if txns %}<a class="btn-ghost" href="{{ url_for('api.transactions_csv') }}"
-       title="Download all transactions as CSV">⬇ Export CSV</a>{% endif %}
+    <h2>History{% if active_filters %} <span class="muted">· filtered</span>{% endif %}</h2>
+    {% if txns %}<a class="btn-ghost" href="{{ url_for('api.transactions_csv', **csv_args) }}"
+       title="Download these transactions as CSV">⬇ Export CSV</a>{% endif %}
   </div>
   {% if txns %}
   <table class="table">
@@ -61,6 +94,9 @@
       {% endfor %}
     </tbody>
   </table>
+  {% elif active_filters %}
+  <p class="empty">No transactions match these filters.
+    <a href="{{ url_for('main.transactions') }}">Clear filters →</a></p>
   {% else %}
   <p class="empty">No transactions yet — add one above.</p>
   {% endif %}

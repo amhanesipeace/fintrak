@@ -46,10 +46,37 @@ def dashboard():
 @main.route("/transactions")
 @login_required
 def transactions():
-    txns = (Transaction.query.filter_by(user_id=current_user.id)
-            .order_by(Transaction.date.desc(), Transaction.id.desc()).all())
+    q = Transaction.query.filter_by(user_id=current_user.id)
+
+    f_type = request.args.get("type")
+    if f_type in ("income", "expense"):
+        q = q.filter_by(type=f_type)
+    f_cat = request.args.get("category")
+    if f_cat:
+        q = q.filter_by(category=f_cat)
+
+    date_error = False
+    try:
+        if request.args.get("from"):
+            q = q.filter(Transaction.date >= datetime.strptime(
+                request.args["from"], "%Y-%m-%d").date())
+        if request.args.get("to"):
+            q = q.filter(Transaction.date <= datetime.strptime(
+                request.args["to"], "%Y-%m-%d").date())
+    except ValueError:
+        date_error = True
+
+    txns = q.order_by(Transaction.date.desc(), Transaction.id.desc()).all()
+    filters = {"type": f_type if f_type in ("income", "expense") else "",
+               "category": f_cat or "", "from": request.args.get("from", ""),
+               "to": request.args.get("to", "")}
+    # Only the filters that are set, for building the CSV-export link so a filtered
+    # view exports exactly what's on screen (the CSV endpoint reads the same args).
+    csv_args = {k: v for k, v in filters.items() if v}
     return render_template("transactions.html", txns=txns, categories=CATEGORIES,
-                           today=date.today().isoformat())
+                           today=date.today().isoformat(), filters=filters,
+                           active_filters=bool(csv_args), csv_args=csv_args,
+                           date_error=date_error)
 
 
 @main.route("/transactions/add", methods=["POST"])

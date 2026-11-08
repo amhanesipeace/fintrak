@@ -258,3 +258,64 @@ def test_edit_recurring_other_user_404(client):
     client.get("/logout", follow_redirects=True)
     _register(client, "intruder")
     assert client.get(f"/recurring/{rid}/edit").status_code == 404
+
+
+def _add_tx(client, type_, amount, category, date_):
+    return client.post("/transactions/add",
+                       data={"type": type_, "amount": amount,
+                             "category": category, "date": date_},
+                       follow_redirects=True)
+
+
+def _row_tag(category):
+    # The category only renders this way in a table ROW (dropdowns use <option>).
+    return f'<span class="tag">{category}</span>'.encode()
+
+
+def test_transactions_filter_by_type_and_category_web(client):
+    _register(client)
+    _add_tx(client, "income", "1000", "Salary", "2026-03-01")
+    _add_tx(client, "expense", "50", "Food", "2026-03-02")
+    _add_tx(client, "expense", "80", "Transport", "2026-03-03")
+
+    # Filter to expenses only: the income row drops out.
+    page = client.get("/transactions?type=expense").data
+    assert _row_tag("Food") in page and _row_tag("Transport") in page
+    assert _row_tag("Salary") not in page
+
+    # Filter to a single category.
+    page = client.get("/transactions?category=Food").data
+    assert _row_tag("Food") in page and _row_tag("Transport") not in page
+
+
+def test_transactions_filter_by_date_range_web(client):
+    _register(client)
+    _add_tx(client, "expense", "10", "Food", "2026-01-15")
+    _add_tx(client, "expense", "20", "Transport", "2026-06-15")
+    page = client.get("/transactions?from=2026-05-01&to=2026-12-31").data
+    assert _row_tag("Transport") in page and _row_tag("Food") not in page
+
+
+def test_transactions_filter_no_match_shows_clear_link(client):
+    _register(client)
+    _add_tx(client, "expense", "10", "Food", "2026-01-15")
+    page = client.get("/transactions?category=Rent").data
+    assert b"No transactions match these filters" in page
+    assert b"Clear filters" in page
+
+
+def test_transactions_bad_date_shows_error_web(client):
+    _register(client)
+    _add_tx(client, "expense", "10", "Food", "2026-01-15")
+    resp = client.get("/transactions?from=not-a-date")
+    assert resp.status_code == 200
+    assert b"valid YYYY-MM-DD" in resp.data
+
+
+def test_transactions_export_link_carries_filters(client):
+    _register(client)
+    _add_tx(client, "expense", "10", "Food", "2026-01-15")
+    page = client.get("/transactions?type=expense&category=Food").data.decode()
+    # The CSV export link preserves the active filters.
+    assert "/api/transactions.csv?" in page
+    assert "type=expense" in page and "category=Food" in page
