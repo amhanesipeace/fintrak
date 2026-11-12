@@ -94,6 +94,17 @@
       {% endfor %}
     </tbody>
   </table>
+  {% if pages > 1 %}
+  <div class="pager">
+    {% if page > 1 %}
+    <a class="btn-sm" href="{{ url_for('main.transactions', page=page-1, **csv_args) }}">← Prev</a>
+    {% else %}<span class="btn-sm disabled">← Prev</span>{% endif %}
+    <span class="muted">Page {{ page }} of {{ pages }} · {{ total }} total</span>
+    {% if page < pages %}
+    <a class="btn-sm" href="{{ url_for('main.transactions', page=page+1, **csv_args) }}">Next →</a>
+    {% else %}<span class="btn-sm disabled">Next →</span>{% endif %}
+  </div>
+  {% endif %}
   {% elif active_filters %}
   <p class="empty">No transactions match these filters.
     <a href="{{ url_for('main.transactions') }}">Clear filters →</a></p>

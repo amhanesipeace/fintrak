@@ -319,3 +319,52 @@ def test_transactions_export_link_carries_filters(client):
     # The CSV export link preserves the active filters.
     assert "/api/transactions.csv?" in page
     assert "type=expense" in page and "category=Food" in page
+
+
+def test_transactions_pagination_limits_and_navigates(client):
+    _register(client)
+    from views import PER_PAGE
+    # Create one more than a full page so there are exactly 2 pages.
+    n = PER_PAGE + 1
+    for i in range(n):
+        _add_tx(client, "expense", str(i + 1), "Food", "2026-01-15")
+
+    page1 = client.get("/transactions").data.decode()
+    assert page1.count('<span class="tag">Food</span>') == PER_PAGE   # capped
+    assert f"Page 1 of 2 · {n} total" in page1
+    assert "Next →" in page1
+
+    page2 = client.get("/transactions?page=2").data.decode()
+    assert page2.count('<span class="tag">Food</span>') == 1          # remainder
+    assert "Page 2 of 2" in page2
+
+
+def test_transactions_no_pager_when_single_page(client):
+    _register(client)
+    _add_tx(client, "expense", "10", "Food", "2026-01-15")
+    page = client.get("/transactions").data.decode()
+    assert 'class="pager"' not in page          # one page -> no controls
+
+
+def test_transactions_page_out_of_range_clamps(client):
+    _register(client)
+    _add_tx(client, "expense", "10", "Food", "2026-01-15")
+    # Page far beyond the end clamps to the last valid page, not an error/empty.
+    resp = client.get("/transactions?page=999")
+    assert resp.status_code == 200
+    assert _row_tag("Food") in resp.data
+    # A non-numeric page falls back to page 1.
+    assert client.get("/transactions?page=abc").status_code == 200
+
+
+def test_transactions_pagination_preserves_filters(client):
+    _register(client)
+    from views import PER_PAGE
+    for i in range(PER_PAGE + 1):
+        _add_tx(client, "expense", str(i + 1), "Food", "2026-01-15")
+    _add_tx(client, "income", "5000", "Salary", "2026-01-16")   # excluded by filter
+
+    page1 = client.get("/transactions?type=expense").data.decode()
+    assert "Page 1 of 2" in page1            # income row didn't inflate the count
+    # The Next link keeps the type filter.
+    assert "type=expense" in page1 and "page=2" in page1

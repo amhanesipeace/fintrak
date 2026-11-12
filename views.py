@@ -18,6 +18,8 @@ main = Blueprint("main", __name__)
 CATEGORIES = ["Salary", "Freelance", "Food", "Rent", "Transport", "Utilities",
               "Entertainment", "Shopping", "Health", "Savings", "Other"]
 
+PER_PAGE = 25   # transactions shown per page on the web history table
+
 
 def _sum(user_id, t_type):
     return float(db.session.query(func.coalesce(func.sum(Transaction.amount), 0.0))
@@ -66,7 +68,18 @@ def transactions():
     except ValueError:
         date_error = True
 
-    txns = q.order_by(Transaction.date.desc(), Transaction.id.desc()).all()
+    q = q.order_by(Transaction.date.desc(), Transaction.id.desc())
+
+    # Paginate: the table can grow unbounded, so show one page at a time.
+    total = q.count()
+    pages = max(1, (total + PER_PAGE - 1) // PER_PAGE)
+    try:
+        page = int(request.args.get("page", 1))
+    except ValueError:
+        page = 1
+    page = max(1, min(page, pages))
+    txns = q.offset((page - 1) * PER_PAGE).limit(PER_PAGE).all()
+
     filters = {"type": f_type if f_type in ("income", "expense") else "",
                "category": f_cat or "", "from": request.args.get("from", ""),
                "to": request.args.get("to", "")}
@@ -76,7 +89,8 @@ def transactions():
     return render_template("transactions.html", txns=txns, categories=CATEGORIES,
                            today=date.today().isoformat(), filters=filters,
                            active_filters=bool(csv_args), csv_args=csv_args,
-                           date_error=date_error)
+                           date_error=date_error, page=page, pages=pages,
+                           total=total, per_page=PER_PAGE)
 
 
 @main.route("/transactions/add", methods=["POST"])

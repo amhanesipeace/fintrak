@@ -106,6 +106,9 @@ a:hover { text-decoration: underline; }
 .row-form .grow { flex: 1; min-width: 160px; }
 .inline-form { display: flex; gap: 6px; align-items: center; }
 .inline-form input { width: 90px; }
+.pager { display: flex; align-items: center; justify-content: center; gap: 16px;
+  margin-top: 16px; font-size: 13px; }
+.btn-sm.disabled { opacity: .4; cursor: default; pointer-events: none; }
 input, select {
   background: var(--panel2); color: var(--text); border: 1px solid var(--line);
   border-radius: 9px; padding: 10px 12px; font: inherit; font-size: 14px; outline: none;
