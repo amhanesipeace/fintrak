@@ -443,3 +443,10 @@ def chart_trend():
 def chart_networth():
     return Response(charts.net_worth_trend_png(current_user.id),
                     mimetype="image/png")
+
+
+@main.route("/charts/allocation.png")
+@login_required
+def chart_allocation():
+    return Response(charts.portfolio_allocation_png(current_user.id),
+                    mimetype="image/png")

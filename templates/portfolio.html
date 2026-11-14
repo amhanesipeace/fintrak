@@ -28,6 +28,12 @@
   </form>
 </div>
 
+{% if rows %}
+<div class="card">
+  <img class="chart" src="{{ url_for('main.chart_allocation') }}" alt="Portfolio allocation">
+</div>
+{% endif %}
+
 <div class="card">
   <div class="card-head"><h2>Your holdings</h2></div>
   {% if rows %}

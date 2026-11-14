@@ -12,8 +12,9 @@ from matplotlib.figure import Figure
 
 from sqlalchemy import func
 
+import market
 from extensions import db
-from models import Transaction
+from models import Holding, Transaction
 
 PANEL = "#171a2b"
 TEXT = "#e8eaf2"
@@ -67,6 +68,45 @@ def spending_by_category_png(user_id):
     ax.legend(wedges, labels, loc="center left", bbox_to_anchor=(1.0, 0.5),
               frameon=False, labelcolor=TEXT, fontsize=9)
     ax.set_title("Spending by category", color=TEXT, fontsize=12, pad=10)
+    return _png(fig)
+
+
+def portfolio_allocation_png(user_id):
+    """Donut of the portfolio split by each holding's market value.
+
+    Fetches live quotes (cached) like the portfolio page does; shows a clear
+    placeholder when there are no holdings or no priced value yet.
+    """
+    fig = Figure(figsize=(5.2, 3.8), dpi=110)
+    fig.patch.set_facecolor(PANEL)
+
+    holdings = Holding.query.filter_by(user_id=user_id).all()
+    if not holdings:
+        return _empty(fig, "No holdings yet")
+
+    prices = market.get_quotes([h.symbol for h in holdings]) or {}
+    valued = [(h.symbol, (prices.get(h.symbol) or 0.0) * h.quantity)
+              for h in holdings]
+    valued = [(sym, val) for sym, val in valued if val > 0]
+    if not valued:
+        return _empty(fig, "No market value yet")
+
+    valued.sort(key=lambda sv: sv[1], reverse=True)
+    labels = [sym for sym, _ in valued]
+    values = [val for _, val in valued]
+
+    ax = fig.add_subplot(111)
+    wedges, _, autotexts = ax.pie(
+        values, colors=PALETTE[:len(values)], startangle=90,
+        autopct=lambda p: f"{p:.0f}%", pctdistance=0.78,
+        wedgeprops=dict(width=0.42, edgecolor=PANEL),
+    )
+    for t in autotexts:
+        t.set_color(TEXT)
+        t.set_fontsize(8.5)
+    ax.legend(wedges, labels, loc="center left", bbox_to_anchor=(1.0, 0.5),
+              frameon=False, labelcolor=TEXT, fontsize=9)
+    ax.set_title("Portfolio allocation", color=TEXT, fontsize=12, pad=10)
     return _png(fig)
 
 

@@ -368,3 +368,16 @@ def test_transactions_pagination_preserves_filters(client):
     assert "Page 1 of 2" in page1            # income row didn't inflate the count
     # The Next link keeps the type filter.
     assert "type=expense" in page1 and "page=2" in page1
+
+
+def test_allocation_chart_endpoint_returns_png(client, mocker):
+    _register(client)
+    # Add a holding via the web form, then the allocation chart should render.
+    mocker.patch("market.get_quotes", return_value={"AAPL": 150.0})
+    mocker.patch("market.lookup_name", return_value="Apple Inc.")
+    client.post("/portfolio/add", data={"symbol": "AAPL", "quantity": "3"},
+                follow_redirects=True)
+    resp = client.get("/charts/allocation.png")
+    assert resp.status_code == 200
+    assert resp.content_type == "image/png"
+    assert resp.data[:8] == b"\x89PNG\r\n\x1a\n"
